@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 
-from neural_models.criterion.base import BaseCriterion
+from neural_models_old.criterion.base import BaseCriterion
 from solvers.solvers import BaseSolver
 from trace_comparison.criterion.clue_reconstruction import ClueReconstructionLoss
 

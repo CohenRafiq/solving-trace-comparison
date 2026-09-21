@@ -2,8 +2,8 @@ from typing import Any
 
 import torch
 
-from neural_models.criterion.abstain import AbstainLoss
-from neural_models.trainers.base import BaseTrainer
+from neural_models_old.criterion.abstain import AbstainLoss
+from neural_models_old.trainers.base import BaseTrainer
 
 
 class NNGSupervisedTrainer(BaseTrainer):

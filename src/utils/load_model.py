@@ -2,7 +2,7 @@ import os
 
 import torch
 
-from neural_models.models.base import BaseModel
+from neural_models_old.models.base import BaseModel
 
 
 def load_model(

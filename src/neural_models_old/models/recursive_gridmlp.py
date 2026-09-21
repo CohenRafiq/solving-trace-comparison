@@ -1,8 +1,8 @@
 import torch
 from torch import Tensor, nn
 
-from neural_models.models.base import BaseModel
-from neural_models.models.layers import CluePositionalEmbedding, GridResidualBlock
+from neural_models_old.models.base import BaseModel
+from neural_models_old.models.layers import CluePositionalEmbedding, GridResidualBlock
 
 
 class RecursiveGridMLP(BaseModel):

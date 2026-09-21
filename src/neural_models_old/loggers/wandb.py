@@ -2,7 +2,7 @@ from typing import Any
 
 import torch
 
-from neural_models.loggers.base import BaseLogger
+from neural_models_old.loggers.base import BaseLogger
 
 
 class WandbLogger(BaseLogger):

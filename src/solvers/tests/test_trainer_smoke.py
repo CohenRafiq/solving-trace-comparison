@@ -2,8 +2,8 @@ import torch
 from torch import nn
 from torch.utils.data import DataLoader, TensorDataset
 
-from neural_models.criterion.abstain import AbstainLoss
-from neural_models.trainers.supervised import NNGSupervisedTrainer
+from neural_models_old.criterion.abstain import AbstainLoss
+from neural_models_old.trainers.supervised import NNGSupervisedTrainer
 
 
 class _PerCellLogits(nn.Module):

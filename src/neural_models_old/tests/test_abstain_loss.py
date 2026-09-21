@@ -3,7 +3,7 @@ import math
 import pytest
 import torch
 
-from neural_models.criterion.abstain import AbstainLoss
+from neural_models_old.criterion.abstain import AbstainLoss
 
 
 def test_output_channels():

@@ -4,8 +4,8 @@ from pathlib import Path
 import numpy as np
 import torch
 
-from neural_models.models.base import BaseModel
-from neural_models.models.recursive_gridmlp import RecursiveGridMLP
+from neural_models_old.models.base import BaseModel
+from neural_models_old.models.recursive_gridmlp import RecursiveGridMLP
 from solvers.solvers import BaseSolver
 from utils.load_model import load_model
 

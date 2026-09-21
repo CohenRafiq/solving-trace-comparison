@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from torch import Tensor
 
-from neural_models.models.base import BaseModel
+from neural_models_old.models.base import BaseModel
 
 
 class Transformer(BaseModel):

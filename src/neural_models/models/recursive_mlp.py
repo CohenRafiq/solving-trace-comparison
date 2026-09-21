@@ -1,47 +1,41 @@
 import torch
-from torch import Tensor, nn
+from torch import nn
 
-from neural_models.models.base import BaseModel
+from neural_models.models.nng_embedding import NonogramClueEmbed
 
+class RecursiveMLP(nn.Module):
+    def __init__(self, input_shape: torch.Size, output_shape: torch.Size, hidden_size: int, num_layers: int, dropout: float):
+        super().__init__()
+        if num_layers < 1:
+            raise ValueError(f"num_layers must be >= 1, got {num_layers}")
 
-class RecursiveMLP(BaseModel):
-    """
-    A feedforward neural network with shared weights between hidden layers.
-    Uses layer norm and depth embeddings for stable training.
-    """
-
-    def __init__(
-        self,
-        input_size: int,
-        output_size: int,
-        hidden_size: int,
-        num_layers: int = 2,
-        dropout: float = 0.1,
-    ):
-        super().__init__(input_size, output_size)
-        self.input_size = input_size
+        self.input_shape = input_shape
+        self.output_shape = output_shape
         self.hidden_size = hidden_size
-        self.output_size = output_size
         self.num_layers = num_layers
-        self.dropout = nn.Dropout(dropout)
-        self.fc1 = nn.Linear(input_size, hidden_size)
-        self.relu = nn.ReLU()
-        self.shared_layer = nn.Linear(hidden_size, hidden_size)
-        self.layer_norm = nn.LayerNorm(hidden_size)
-        self.depth_embeddings = nn.Embedding(num_layers, hidden_size)  # one vector per iteration
-        self.fc2 = nn.Linear(hidden_size, output_size)
-        self.sigmoid = nn.Sigmoid()
 
-    def forward(self, x: Tensor) -> Tensor:
-        out = self.fc1(x)
-        out = self.relu(out)
-        out = self.dropout(out)
-        for i in range(self.num_layers - 1):
-            depth_emb = self.depth_embeddings(torch.tensor(i, device=x.device))
-            out = self.layer_norm(out + depth_emb)  # tell the layer which iteration it's on
-            out = out + self.shared_layer(out)
-            out = self.relu(out)
-            out = self.dropout(out)
-        out = self.fc2(out)
-        out = self.sigmoid(out)
+        self.clue_embed = NonogramClueEmbed(input_shape, hidden_size)
+        self.core = nn.Sequential(
+            nn.Linear(hidden_size, hidden_size),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(hidden_size, hidden_size),
+            nn.GELU(),
+            nn.Dropout(dropout),
+        )
+        self.answer_proj = nn.Sequential(
+            nn.Linear(hidden_size, hidden_size),
+            nn.GELU(),
+            nn.Linear(hidden_size, output_shape.numel()),
+            nn.Sigmoid(),
+        )
+
+    def forward(self, x: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
+        x = x.flatten(start_dim=1)  # Flatten the clues for embedding
+        x = self.clue_embed(x, mask)
+        for _ in range(self.num_layers):
+            x = self.core(x)
+        out = self.answer_proj(x)
+        # out = out.view(out.size(0), self.output_shape[0], -1) # Reshape to (batch, categories, height * width)
+        out = out.view(out.size(0), *self.output_shape)  # Reshape to (batch, height, width)
         return out

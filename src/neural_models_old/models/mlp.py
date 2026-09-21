@@ -1,6 +1,6 @@
 from torch import Tensor, nn
 
-from neural_models.models.base import BaseModel
+from neural_models_old.models.base import BaseModel
 
 
 class MultiLayerPerceptron(BaseModel):

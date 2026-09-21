@@ -1,4 +1,4 @@
-from neural_models.loggers.base import BaseLogger
+from neural_models_old.loggers.base import BaseLogger
 
 
 class NullLogger(BaseLogger):

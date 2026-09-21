@@ -1,0 +1,44 @@
+seed: 42
+batch_size: 256
+epochs: 100
+model_save_path: outputs/
+
+train_dataset:
+  _target_: neural_models.dataset.NonogramsDataset
+  file_name: 5x5-700_000-train.jsonl
+  max_size: 10000
+  padding_type: "positional"
+
+val_dataset:
+  _target_: neural_models.dataset.NonogramsDataset
+  file_name: 5x5-100_000-val.jsonl
+  max_size: 1000
+  padding_type: "positional"
+
+model:
+  _target_: neural_models.models.recursive_mlp.RecursiveMLP
+  hidden_size: 256
+  num_layers: 5
+  dropout: 0.4
+
+# criterion:
+#   _target_: neural_models.criterions.AbstainLoss
+#   abstain_penalty: 0.1
+criterion:
+  _target_: neural_models.criterions.MSELoss
+
+optimizer:
+  _target_: torch.optim.Adam
+  lr: 1e-3
+  weight_decay: 1e-5
+
+logger:
+  _target_: neural_models.logger.Logger
+  enabled: false
+  log_every: 5
+  project: nonograms_5x5
+  name: null
+  group: null
+  tags: []
+  should_log_model: true
+  save_code: true
