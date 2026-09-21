@@ -1,8 +1,10 @@
-from pathlib import Path
-import torch
-from torch.utils.data import Dataset
 import json
 import os
+from pathlib import Path
+
+import torch
+from torch.utils.data import Dataset
+
 
 class JsonShapeError(Exception):
     """Raised when the shape of the data in the JSON file is not as expected."""
@@ -28,7 +30,7 @@ class NonogramsDataset(Dataset):
         clues, grids = [], []
         data_dir = Path(os.environ.get("DATA_DIR", "./data")) / "base_dataset" / "nonograms"
         data_path = data_dir / file_name
-        with open(data_path, "r") as fh:
+        with open(data_path) as fh:
             for line in fh:
                 sample = json.loads(line)
                 if "clues" in sample:
@@ -43,20 +45,22 @@ class NonogramsDataset(Dataset):
                 try:
                     grids.append(sample["grid"])
                 except KeyError as e:
-                    raise JsonShapeError(f"Missing key in JSON data: {e}")
+                    raise JsonShapeError(f"Missing key in JSON data: {e}") from e
                 if max_size is not None and len(clues) >= max_size:
                     break
         return clues, grids
 
     def pad_positional(self, clues):
-        max_dimension = max(len(clues[0][0]), len(clues[0][1]))  # is rows or cols greater
-        max_runs_in_clue = (max_dimension + 1) // 2  # worst case: alternating 1s and 0s
+        max_runs_in_clue = max(
+            (len(line) for puzzle in clues for groups in puzzle for line in groups),
+            default=0,
+        )
 
         def pad(line):
             return line + [0] * (max_runs_in_clue - len(line))
 
         padded = torch.tensor(
-            [[[pad(line) for line in groups] for groups in puzzle] 
+            [[[pad(line) for line in groups] for groups in puzzle]
             for puzzle in clues],
             dtype=torch.long
         )
@@ -65,7 +69,9 @@ class NonogramsDataset(Dataset):
 
     def pad_sequential(self, clues):
         max_dimension = max(len(clues[0][0]), len(clues[0][1]))
-        max_padding = 2 * max_dimension * ((max_dimension + 1) // 2)  # upper bound on total number of inputs
+        max_padding = 2 * max_dimension * (
+            (max_dimension + 1) // 2
+        )  # upper bound on total number of inputs
 
         padded, masks = [], []
         for puzzle in clues:
@@ -87,7 +93,7 @@ class NonogramsDataset(Dataset):
 
     def __getitem__(self, idx):
         return (
-            self.clues[idx], 
-            self.pad_mask[idx], 
+            self.clues[idx],
+            self.pad_mask[idx],
             self.grid[idx]
             )

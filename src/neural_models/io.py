@@ -21,7 +21,8 @@ def save_model(cfg, model, logger):
     dataset_name = cfg.train_dataset._target_.split(".")[-1].lower()
     model_name = cfg.model._target_.split(".")[-1].lower()
 
-    model_dir = Path("models") / dataset_name / model_name
+    model_save_root = Path(getattr(cfg, "model_save_path", "models/"))
+    model_dir = model_save_root / dataset_name / model_name
     model_dir.mkdir(parents=True, exist_ok=True)
 
     next_num = get_next_model_number(model_dir)

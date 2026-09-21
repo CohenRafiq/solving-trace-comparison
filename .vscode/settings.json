@@ -1,15 +1,10 @@
 {
     "python-envs.defaultEnvManager": "ms-python.python:system",
-    "dotfileToggle.hideDotfiles": true,
+    "dotfileToggle.hideDotfiles": false,
     "files.exclude": {
         "**/.git": true,
         "**/.svn": true,
         "**/.hg": true,
-        "**/.DS_Store": true,
-        "**/Thumbs.db": true,
-        "**/.*": true,
-        "**/.vscode": true,
-        "**/.gitignore": true,
-        "**/.env": true
+        "**/Thumbs.db": true
     }
 }

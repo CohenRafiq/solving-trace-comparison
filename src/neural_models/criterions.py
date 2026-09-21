@@ -1,8 +1,9 @@
 import math
 
 import torch
-from torch import nn
 import torch.nn.functional as F
+from torch import nn
+
 
 class MSELoss(nn.MSELoss):
     """Mean squared error loss with added prediction."""
@@ -25,12 +26,6 @@ class AbstainLoss(nn.Module):
         self.eps = eps
 
     def forward(self, preds: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
-        """
-        Args:
-            preds: [batch, num_classes + 1, cells] — raw logits per class, with
-                the last channel being abstain.
-            targets: [batch, cells] — class indices in [0, num_classes - 1].
-        """
         preds = preds.flatten(start_dim=2)
         targets = targets.flatten(start_dim=1)
         num_classes = preds.size(1) - 1
@@ -57,9 +52,9 @@ class AbstainLoss(nn.Module):
         p_y_renorm = (p_y / committed).clamp(min=self.eps, max=1.0)
 
         ce_loss = -torch.log(p_y_renorm)
-        abstain_cost = p_abs * l_abs
+        abstain_cost = abstain_cost = -l_abs * torch.log(committed)
 
-        loss = ce_loss + abstain_cost
+        loss = committed * ce_loss + abstain_cost
 
         return loss.mean()
 
