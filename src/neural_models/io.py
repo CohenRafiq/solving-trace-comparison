@@ -3,8 +3,11 @@ import json
 import re
 from datetime import UTC, datetime
 from pathlib import Path
+from omegaconf import DictConfig
+from neural_models.logger import Logger
 
 import torch
+from torch import nn
 
 try:
     from omegaconf import OmegaConf
@@ -35,7 +38,7 @@ def _load_index(index_path: Path) -> list[dict]:
     return []
 
 
-def _config_digest(cfg) -> str:
+def _config_digest(cfg: DictConfig) -> str:
     try:
         if OmegaConf is not None:
             payload = json.dumps(OmegaConf.to_container(cfg, resolve=True), sort_keys=True)
@@ -55,7 +58,7 @@ def _run_dir() -> str | None:
         return None
 
 
-def save_model(cfg, model, logger, metrics: dict | None = None):
+def save_model(cfg: DictConfig, model: nn.Module, logger: Logger, metrics: dict | None = None):
     """Save the model state dict and record a metadata entry in the index file."""
     dataset_name = cfg.train_dataset._target_.split(".")[-1].lower()
     model_name = cfg.model._target_.split(".")[-1].lower()

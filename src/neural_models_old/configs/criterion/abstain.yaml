@@ -1,5 +1,0 @@
-# @package _global_
-criterion:
-  _target_: neural_models.criterion.abstain.AbstainLoss
-  abstain_penalty: 0.4
-  entropy_weight: 0.1

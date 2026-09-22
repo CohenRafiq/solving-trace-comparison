@@ -1,5 +1,0 @@
-# @package _global_
-scheduler:
-  _target_: torch.optim.lr_scheduler.CosineAnnealingLR
-  T_max: ${trainer.epochs}   # decays over full training run
-  eta_min: 1e-6              # minimum LR floor

@@ -1,6 +1,0 @@
-# @package _global_
-model:
-  _target_: neural_models.models.mlp.MultiLayerPerceptron
-  hidden_size: 256
-  num_layers: 9
-  dropout: 0.3

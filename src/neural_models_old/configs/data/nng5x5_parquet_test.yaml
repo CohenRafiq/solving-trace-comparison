@@ -1,4 +1,0 @@
-# @package _global_
-data:
-  _target_: solvers.dataset.nonogram_dataset.NonogramDataset
-  data: "data/raw/nng_5x5_test.parquet"

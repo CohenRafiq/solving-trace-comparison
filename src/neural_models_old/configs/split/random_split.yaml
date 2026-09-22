@@ -1,5 +1,0 @@
-# @package _global_
-split:
-  train_ratio: 0.8
-  seed: 42
-  max_samples: null

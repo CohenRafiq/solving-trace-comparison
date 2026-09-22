@@ -1,8 +1,0 @@
-# @package _global_
-logger:
-  _target_: neural_models.loggers.wandb.WandbLogger
-  project: ${wandb_project}
-  name: null
-  group: null
-  tags: []
-  should_log_model: true

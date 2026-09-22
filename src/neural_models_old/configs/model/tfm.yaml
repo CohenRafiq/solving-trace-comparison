@@ -1,7 +1,0 @@
-# @package _global_
-model:
-  _target_: neural_models.models.tfm.Transformer
-  hidden_size: 512
-  num_layers: 12
-  num_heads: 8
-  dropout: 0.1

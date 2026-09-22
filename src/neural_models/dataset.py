@@ -50,7 +50,7 @@ class NonogramsDataset(Dataset):
                     break
         return clues, grids
 
-    def pad_positional(self, clues):
+    def pad_positional(self, clues: list[list[list[int]]]):
         max_runs_in_clue = max(
             (len(line) for puzzle in clues for groups in puzzle for line in groups),
             default=0,
@@ -67,7 +67,7 @@ class NonogramsDataset(Dataset):
         mask = padded != 0
         return padded, mask.float()  # Convert mask to float for compatibility with loss functions
 
-    def pad_sequential(self, clues):
+    def pad_sequential(self, clues: list[list[list[int]]]):
         max_dimension = max(len(clues[0][0]), len(clues[0][1]))
         max_padding = 2 * max_dimension * (
             (max_dimension + 1) // 2
@@ -91,7 +91,7 @@ class NonogramsDataset(Dataset):
     def __len__(self):
         return len(self.clues)
 
-    def __getitem__(self, idx):
+    def __getitem__(self, idx: int):
         return (
             self.clues[idx],
             self.pad_mask[idx],

@@ -1,3 +1,0 @@
-# @package _global_
-logger:
-  _target_: neural_models.loggers.null.NullLogger

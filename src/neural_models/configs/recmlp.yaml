@@ -1,6 +1,6 @@
 seed: 42
 batch_size: 2048
-epochs: 10
+epochs: 100
 model_save_path: checkpoints/
 num_workers: 6
 pin_memory: true
@@ -8,34 +8,32 @@ pin_memory: true
 train_dataset:
   _target_: neural_models.dataset.NonogramsDataset
   file_name: 5x5-700_000-train.jsonl
-  max_size: 10000
+  # max_size: 10000
+  max_size: null
   padding_type: "positional"
 
 val_dataset:
   _target_: neural_models.dataset.NonogramsDataset
   file_name: 5x5-100_000-val.jsonl
-  max_size: 1000
+  # max_size: 1000
+  max_size: null
   padding_type: "positional"
 
 model:
-  _target_: neural_models.models.recursive_mlp.RecursiveMLP
+  # _target_: neural_models.models.recursive_mlp.RecursiveMLP
+  _target_: neural_models.models.recursive_grid_mlp.RecursiveGridMLP
+#   _target_: neural_models.models.recursive_cnn.RecursiveCNN
+#   _target_: neural_models.models.recursive_transformer.RecursiveTransformer
   hidden_size: 256
   num_layers: 9
   dropout: 0.3
+#   num_heads: 4
   sigmoid_output: false
-# model:
-#   _target_: neural_models.models.recursive_grid_mlp.RecursiveGridMLP
-#   hidden_size: 256
-#   num_layers: 9
-#   dropout: 0.3
-#   sigmoid_output: false
 
 criterion:
   _target_: neural_models.criterions.AbstainLoss
-  abstain_penalty: 0.2
-  # entropy_weight: 0.1
-# criterion:
 #   _target_: neural_models.criterions.MSELoss
+  abstain_penalty: 0.2
 
 optimizer:
   _target_: torch.optim.Adam
@@ -48,7 +46,7 @@ lr_scheduler:
 
 logger:
   _target_: neural_models.logger.Logger
-  enabled: false
+  enabled: true
   log_every: 1
   project: nonograms_5x5
   name: null

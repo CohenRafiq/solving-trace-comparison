@@ -1,4 +1,0 @@
-# @package _global_
-criterion:
-  _target_: trace_comparison.criterion.clue_reconstruction.ClueReconstructionLoss
-  reduction: mean

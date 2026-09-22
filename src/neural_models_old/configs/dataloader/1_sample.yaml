@@ -1,8 +1,0 @@
-# @package _global_
-dataloader:
-  _target_: torch.utils.data.DataLoader
-  batch_size: 8
-  num_workers: 1  # or more, depending on your CPU cores
-  # prefetch_factor: 2
-  pin_memory: true  # if using GPU (speeds up CPU→GPU transfer)
-  persistent_workers: true  # avoids worker spawn overhead
