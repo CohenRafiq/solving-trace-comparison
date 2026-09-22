@@ -13,7 +13,8 @@ from utils.load_model import load_model
 class ModelSolver(BaseSolver):
     default_step_ratio: int = 1
     default_model_path: str = os.path.join(
-        os.getenv("MODEL_DIR", "./models/"), "jsonldataset/recursivegridmlp/06.pt"
+        os.getenv("MODEL_DIR", "./archive/legacy-model_checkpoints/"),
+        "jsonldataset/recursivegridmlp/06.pt",
     )
 
     def __init__(self, model: BaseModel | str | Path | None = None):

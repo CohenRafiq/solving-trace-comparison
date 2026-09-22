@@ -1,5 +1,6 @@
-import wandb
 from torch import nn
+
+import wandb
 
 
 class Logger:
@@ -17,11 +18,15 @@ class Logger:
         enabled: bool = True,
         log_every: int = 10,
         should_log_model: bool = False,
+        log: str = "gradients",
+        log_freq: int = 200,
         config: dict | None = None,
     ):
         self.enabled = enabled
         self.log_every = log_every
         self.should_log_model = should_log_model
+        self.log = log
+        self.log_freq = log_freq
         self._step = 0
 
         if self.enabled:
@@ -34,6 +39,12 @@ class Logger:
                 save_code=save_code,
                 config=config,
             )
+
+    @property
+    def run_id(self) -> str | None:
+        if not self.enabled or wandb.run is None:
+            return None
+        return wandb.run.id
 
     def log_metrics(self, metrics: dict[str, float], step: int | None = None):
         if not self.enabled or self._step % self.log_every != 0:
@@ -49,9 +60,9 @@ class Logger:
         artifact.add_file(model_path)
         wandb.log_artifact(artifact)
 
-    def watch_model(self, model: nn.Module, log_freq: int = 100):
+    def watch_model(self, model: nn.Module, log_freq: int | None = None):
         if self.enabled:
-            wandb.watch(model, log="all", log_freq=log_freq)
+            wandb.watch(model, log=self.log, log_freq=log_freq or self.log_freq)
 
     def finish(self):
         if self.enabled:

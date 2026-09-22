@@ -15,8 +15,14 @@ data/traces_dataset/nonograms/*
 model_checkpoints/*
 models/*
 outputs/*
+checkpoints/*
+archive/*
 run_experiments/artifacts/*
 results/*
+
+# Keep the checkpoints/archive folders (track the .gitkeep files)
+!checkpoints/.gitkeep
+!archive/.gitkeep
 
 # Keep the folders (don't ignore the .gitkeep files)
 !data/raw/.gitkeep

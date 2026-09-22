@@ -57,31 +57,39 @@ class Trainer:
 
 
 def train(trainer: Trainer, train_loader: DataLoader, val_loader: DataLoader,
-          epochs: int, logger: Logger, scheduler=None):
+          epochs: int, logger: Logger, scheduler=None) -> dict[str, float]:
+    final_metrics = {}
     for epoch in range(epochs):
-        train_loss, train_acc, additional_metrics = trainer.run_epoch(train_loader, train=True)
-        val_loss, val_acc, additional_metrics = trainer.run_epoch(val_loader, train=False)
+        train_loss, train_acc, train_additional = trainer.run_epoch(train_loader, train=True)
+        val_loss, val_acc, val_additional = trainer.run_epoch(val_loader, train=False)
 
         if scheduler is not None:
             scheduler.step()
 
-        logger.log_metrics(
-            {
-                "train_loss": train_loss,
-                "val_loss": val_loss,
-                "train_accuracy": train_acc,
-                "val_accuracy": val_acc,
-                **additional_metrics
-            },
-            step=epoch,
-        )
+        metrics = {
+            "train_loss": float(train_loss),
+            "val_loss": float(val_loss),
+            "train_accuracy": float(train_acc),
+            "val_accuracy": float(val_acc),
+        }
+        if "abstain_rate" in train_additional:
+            metrics["train_abstain_rate"] = float(train_additional["abstain_rate"])
+        if "abstain_rate" in val_additional:
+            metrics["val_abstain_rate"] = float(val_additional["abstain_rate"])
+        logger.log_metrics(metrics, step=epoch)
 
         print(
             f"Epoch [{epoch + 1}/{epochs}] | LOSSES - "
             f"Train: {train_loss:.4f}, Val: {val_loss:.4f} | "
             f"ACCURACY - Train: {train_acc:.4f}, Val: {val_acc:.4f}"
-            + (f" | Abstain Rate: {additional_metrics['abstain_rate']:.4f}" if "abstain_rate" in additional_metrics else "")
+            + (
+                f" | Abstain Rate: {val_additional['abstain_rate']:.4f}"
+                if "abstain_rate" in val_additional
+                else ""
+            )
         )
+        final_metrics = metrics
+    return final_metrics
 
 
 @hydra.main(version_base=None, config_path="configs", config_name="recmlp")
@@ -122,8 +130,8 @@ def main(cfg: DictConfig):
     trainer = Trainer(model=model, optimizer=optimizer, criterion=criterion, device=device)
 
     try:
-        train(trainer, train_loader, val_loader, cfg.epochs, logger, scheduler)
-        save_model(cfg, model, logger)
+        final_metrics = train(trainer, train_loader, val_loader, cfg.epochs, logger, scheduler)
+        save_model(cfg, model, logger, final_metrics)
     finally:
         logger.finish()
 

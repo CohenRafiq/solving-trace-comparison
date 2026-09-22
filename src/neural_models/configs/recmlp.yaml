@@ -1,20 +1,20 @@
 seed: 42
 batch_size: 2048
-epochs: 100
-model_save_path: outputs/
+epochs: 10
+model_save_path: checkpoints/
 num_workers: 6
 pin_memory: true
 
 train_dataset:
   _target_: neural_models.dataset.NonogramsDataset
   file_name: 5x5-700_000-train.jsonl
-  max_size: 100000
+  max_size: 10000
   padding_type: "positional"
 
 val_dataset:
   _target_: neural_models.dataset.NonogramsDataset
   file_name: 5x5-100_000-val.jsonl
-  max_size: 10000
+  max_size: 1000
   padding_type: "positional"
 
 model:
@@ -48,7 +48,7 @@ lr_scheduler:
 
 logger:
   _target_: neural_models.logger.Logger
-  enabled: true
+  enabled: false
   log_every: 1
   project: nonograms_5x5
   name: null
@@ -56,3 +56,5 @@ logger:
   tags: []
   should_log_model: true
   save_code: true
+  log: gradients
+  log_freq: 200

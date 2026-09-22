@@ -1,7 +1,7 @@
 import torch
 from torch import nn
 
-from neural_models.models.nng_embedding import ClueContext
+from neural_models.models.nng_embedding import CluePositionalEmb
 
 
 class RecursiveMLP(nn.Module):
@@ -23,7 +23,7 @@ class RecursiveMLP(nn.Module):
         self.hidden_size = hidden_size
         self.num_layers = num_layers
 
-        self.clue_embed = ClueContext(
+        self.clue_embed = CluePositionalEmb(
             input_size=int(torch.prod(torch.as_tensor(input_shape))),
             hidden_size=hidden_size,
             dropout=dropout,
@@ -45,10 +45,11 @@ class RecursiveMLP(nn.Module):
             answer_proj.append(nn.Sigmoid())
         self.answer_proj = nn.Sequential(*answer_proj)
 
-    def forward(self, x: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, mask: torch.Tensor, layer_num: int | None = None
+                ) -> torch.Tensor:
         x = x.flatten(start_dim=1)  # Flatten the clues for embedding
         x = self.clue_embed(x, mask)
-        for _ in range(self.num_layers):
+        for _ in range(self.num_layers if layer_num is None else layer_num):
             x = self.core(x) + x  # Residual connection
         out = self.answer_proj(x)
         out = out.view(out.size(0), *self.output_shape)  # Reshape to (batch, height, width)

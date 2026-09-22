@@ -1,7 +1,7 @@
 import torch
 from torch import Tensor, nn
 
-from neural_models.models.nng_embedding import ClueContext
+from neural_models.models.nng_embedding import CluePositionalEmb
 
 
 class GridResidualBlock(nn.Module):
@@ -64,7 +64,7 @@ class RecursiveGridMLP(nn.Module):
 
         self.register_buffer("grid", torch.zeros(1, self.output_size))
 
-        self.clue_embed = ClueContext(
+        self.clue_embed = CluePositionalEmb(
             input_size=int(torch.prod(torch.as_tensor(input_shape))),
             hidden_size=hidden_size,
             dropout=dropout,
