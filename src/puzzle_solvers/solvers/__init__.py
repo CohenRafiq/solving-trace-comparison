@@ -1,9 +1,9 @@
-from .base import BaseSolver
-from .genetic_algorithm import (
+from puzzle_solvers.solvers.base import BaseSolver, StoppingReason
+from puzzle_solvers.solvers.genetic_algorithm import (
     GeneticAlgorithmDEP,
     GeneticAlgorithmDET,
 )
-from .gradient_descent import (
+from puzzle_solvers.solvers.gradient_descent import (
     GDBangBangSolver,
     GDGaussSeidelAdamSolver,
     GDGaussSeidelSGDSolver,
@@ -12,12 +12,13 @@ from .gradient_descent import (
     GDJacobiAdamSolver,
     GDJacobiSGDSolver,
 )
-from .mac import MAC
-from .model_solver import ModelSolver
-from .search import BacktrackingSearch
+from puzzle_solvers.solvers.mac import MAC
+from puzzle_solvers.solvers.model_solver import ModelSolver
+from puzzle_solvers.solvers.search import BacktrackingSearch
 
 __all__ = [
     "BaseSolver",
+    "StoppingReason",
     "MAC",
     "GeneticAlgorithmDET",
     "GeneticAlgorithmDEP",

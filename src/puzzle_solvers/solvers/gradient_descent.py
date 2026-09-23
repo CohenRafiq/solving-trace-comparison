@@ -1,15 +1,27 @@
 import numpy as np
 import torch
 
-from neural_models_old.criterion.base import BaseCriterion
-from solvers.solvers import BaseSolver
-from trace_comparison.criterion.clue_reconstruction import ClueReconstructionLoss
+from puzzle_solvers.solvers.base import BaseSolver
+from trace_comparison.criterion.clue_reconstruction2 import ClueReconstructionLoss
 
 
 class BaseGradientDescentSolver(BaseSolver):
-    def __init__(self, loss_fn: BaseCriterion | None = None, **kwargs):
-        self.loss_fn = loss_fn if loss_fn is not None else ClueReconstructionLoss(reduction="none")
+    _optimizer_state_ready: bool = False
+
+    def __init__(self, loss_fn=None, **kwargs):
+        self.loss_fn = (
+            loss_fn
+            if loss_fn is not None
+            else ClueReconstructionLoss(
+                reduction="none",
+                aux_weight_start=0.0,
+                aux_weight_end=0.0,
+                entropy_weight_start=0.0,
+                entropy_weight_end=0.0,
+            )
+        )
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self._optimizer_state_ready = False
         super().__init__(**kwargs)
 
     def _sample_grid(self, n: int, sampling_ratio: float) -> torch.Tensor:
@@ -19,13 +31,22 @@ class BaseGradientDescentSolver(BaseSolver):
         return self._sample_grid(n, sampling_ratio)
 
     def _reset_optimizer_state(self, n: int) -> None:
-        """Called once at the start of each `_step` call."""
+        """Called once at the start of each `solve` call."""
         raise NotImplementedError
 
     def _compute_update(self, grad: torch.Tensor, idxs: torch.Tensor) -> torch.Tensor:
         """Return the parameter delta (same shape as `grad` / `idxs`).
         Called inside a `torch.no_grad()` block by the update mixins."""
         raise NotImplementedError
+
+    def _reset_state(self, clues: np.ndarray, prev: np.ndarray) -> None:
+        """Persistent per-solve state: cached clues tensor + optimizer state."""
+        self._n = int(np.asarray(prev).size)
+        self._clues_t = torch.tensor(
+            np.asarray(clues).flatten(), dtype=torch.float32, device=self.device
+        ).unsqueeze(0)
+        self._reset_optimizer_state(self._n)
+        self._optimizer_state_ready = True
 
     def _optimise(
         self, prev: torch.Tensor, n: int, sampling_ratio: float, tensor_clues: torch.Tensor
@@ -35,9 +56,8 @@ class BaseGradientDescentSolver(BaseSolver):
     def _step(
         self, clues: np.ndarray, prev: np.ndarray, num_steps: int, sampling_ratio: float = 1.0
     ) -> np.ndarray:
-        tensor_clues = torch.tensor(
-            np.asarray(clues).flatten(), dtype=torch.float32, device=self.device
-        ).unsqueeze(0)
+        if not self._optimizer_state_ready:
+            self._reset_state(clues, prev)
 
         prev_t = torch.tensor(prev, dtype=torch.float32, device=self.device)
         prev_t = torch.clamp(prev_t, 1e-6, 1 - 1e-6)
@@ -46,11 +66,9 @@ class BaseGradientDescentSolver(BaseSolver):
         steps_torch = [logit_grid]
         n = logit_grid.numel()
 
-        self._reset_optimizer_state(n)
-
         for _ in range(num_steps):
             current = steps_torch[-1]
-            new_logits = self._optimise(current, n, sampling_ratio, tensor_clues)
+            new_logits = self._optimise(current, n, sampling_ratio, self._clues_t)
             steps_torch.append(new_logits)
 
         steps = [torch.sigmoid(step).detach().cpu().numpy() for step in steps_torch[1:]]
@@ -63,7 +81,6 @@ class BaseGradientDescentSolver(BaseSolver):
 
 
 class AdamOptimizerMixin:
-    default_step_ratio: int = 5
     device: torch.device
     _m: torch.Tensor | None
     _v: torch.Tensor | None
@@ -131,8 +148,6 @@ class AdamOptimizerMixin:
 
 
 class SGDOptimizerMixin:
-    default_step_ratio: int = 3
-
     def __init__(self, step_size: float = 70.0, **kwargs):
         self.step_size = step_size
         super().__init__(**kwargs)
@@ -149,8 +164,6 @@ class SGDOptimizerMixin:
 
 
 class BangBangOptimizerMixin:
-    default_step_ratio: int = 3
-
     def __init__(self, step_size: float = 10.0, **kwargs):
         self.step_size = step_size
         super().__init__(**kwargs)
@@ -172,7 +185,7 @@ class BangBangOptimizerMixin:
 
 class GlobalMixin:
     device: torch.device
-    loss_fn: BaseCriterion
+    loss_fn: ClueReconstructionLoss
 
     def _optimise(
         self,
@@ -204,7 +217,7 @@ class GlobalMixin:
 
 class GaussSeidelMixin:
     device: torch.device
-    loss_fn: BaseCriterion
+    loss_fn: ClueReconstructionLoss
 
     def _optimise(
         self,
@@ -222,7 +235,6 @@ class GaussSeidelMixin:
 
         order = idxs[torch.randperm(idxs.numel(), device=self.device)]
 
-        # Pre-allocate reusable tensor for the candidate grid
         candidate_buf = grid.clone()
 
         for _, i in enumerate(order):
@@ -230,7 +242,6 @@ class GaussSeidelMixin:
 
             fixed_val = grid[i].clone()
 
-            # Reuse pre-allocated buffer: reset to current grid state
             candidate_buf.copy_(grid)
             candidate_buf[i_scalar] = fixed_val
             candidate_buf.requires_grad_(True)
@@ -246,7 +257,6 @@ class GaussSeidelMixin:
                 update = self._compute_update(grad_i, i.unsqueeze(0))  # type: ignore[attr-defined]
                 grid[i] = fixed_val - update
 
-            # Detach for next iteration
             candidate_buf.detach_()
 
         return grid.view(prev.shape)
@@ -254,7 +264,7 @@ class GaussSeidelMixin:
 
 class JacobiMixin:
     device: torch.device
-    loss_fn: BaseCriterion
+    loss_fn: ClueReconstructionLoss
 
     def _optimise(
         self,
@@ -274,26 +284,19 @@ class JacobiMixin:
         order = idxs[torch.randperm(idxs.numel(), device=self.device)]
         num_selected = order.numel()
 
-        # Vectorized Jacobi: create batch of candidates, one per selected cell
-        # Each candidate differs from anchor at exactly one position
         batch_candidates = anchor.unsqueeze(0).expand(num_selected, -1).clone()
 
-        # Set each candidate's selected cell to a leaf variable with requires_grad
         fixed_vals = anchor[order].clone()
         free_vals = fixed_vals.clone().requires_grad_(True)
 
-        # Scatter free_vals into the batch: candidate[i, order[i]] = free_vals[i]
         batch_idx = torch.arange(num_selected, device=self.device)
         batch_candidates[batch_idx, order] = free_vals
 
-        # Batch forward pass through loss
         batch_clues = tensor_clues.expand(num_selected, -1)
         losses = self.loss_fn(batch_candidates, batch_clues)
         if isinstance(losses, tuple):
             losses = losses[0]
-        # losses shape: (num_selected,)
 
-        # Backward pass: get gradient of total loss w.r.t. free_vals
         total_loss = losses.sum()
         total_loss.backward()
 
@@ -303,7 +306,6 @@ class JacobiMixin:
         with torch.no_grad():
             updates = self._compute_update_batch(grads, order)
 
-        # Apply all updates simultaneously
         grid[order] = fixed_vals - updates
 
         return grid.view(prev.shape)

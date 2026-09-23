@@ -9,3 +9,8 @@ Experiments TODO
     - loss function
     - number of layers
     - abstain loss, does it know where it is wrong, does it refine its output
+- train model on solving traces
+    - see if the model performs better on some trace
+    - does it generalise better
+    - how similar are traces on unseen puzzles
+    - how similar on larger puzzles

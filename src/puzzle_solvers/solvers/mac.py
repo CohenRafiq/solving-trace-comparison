@@ -1,23 +1,18 @@
-import random
 from functools import lru_cache
 
 import numpy as np
 
-from solvers.solvers import BaseSolver
-from utils.grid import ternarise, unpad_clue
+from puzzle_solvers.solvers.base import BaseSolver
+from utils.grid import unpad_clue
 
 
 class MAC(BaseSolver):
-    default_step_ratio: int = 2
-
-    def __init__(self, sampling_ratio_modifier: float = 0.5):
-        self.sampling_ratio_modifier = sampling_ratio_modifier
+    def __init__(self):
         super().__init__()
 
     @staticmethod
     @lru_cache(maxsize=10_000)
     def _row_probabilities_cached(blocks: tuple, length: int, known: tuple) -> np.ndarray | None:
-        """Cached row probability computation."""
         known_arr = list(known) if known is not None else [-1] * length
         k = len(blocks)
 
@@ -91,7 +86,6 @@ class MAC(BaseSolver):
     def _row_probabilities(
         self, blocks: tuple[int, ...], length: int, known: tuple[int, ...] | None = None
     ) -> np.ndarray | None:
-        """Wrapper that converts to hashable types for caching."""
         blocks_tuple = tuple(int(b) for b in blocks)
         known_tuple = tuple(int(x) for x in known) if known is not None else tuple([-1] * length)
         return self._row_probabilities_cached(blocks_tuple, length, known_tuple)
@@ -99,7 +93,6 @@ class MAC(BaseSolver):
     @staticmethod
     @lru_cache(maxsize=10_000)
     def _combine_cached(p_tuple: tuple, q_tuple: tuple) -> tuple | None:
-        """Cached combine operation."""
         p = np.array(p_tuple, dtype=np.float64)
         q = np.array(q_tuple, dtype=np.float64)
         with np.errstate(divide="ignore", invalid="ignore"):
@@ -110,7 +103,6 @@ class MAC(BaseSolver):
         return tuple(result.flatten().tolist())
 
     def _combine(self, p: np.ndarray, q: np.ndarray) -> np.ndarray | None:
-        """Wrapper that converts to hashable types for caching."""
         if p is None or q is None:
             return None
         p_tuple = tuple(p.flatten().tolist())
@@ -120,52 +112,49 @@ class MAC(BaseSolver):
             return None
         return np.array(result).reshape(p.shape)
 
-    def _loop_directions(
-        self, grid: np.ndarray, direction_clues, known_grid: np.ndarray, sampling_ratio: float
-    ) -> np.ndarray | None:
-        output_grid = grid.copy()
+    def _loop_directions(self, grid: np.ndarray, direction_clues) -> tuple[np.ndarray | None, np.ndarray | None]:
+        length = grid.shape[1]
+        certain_grid = np.where(grid <= 0.0, 0.0, np.where(grid >= 1.0, 1.0, 0.5))
+        probs_grid = np.full(grid.shape, 0.5)
+
         for i in range(grid.shape[0]):
             blocks = unpad_clue(direction_clues[i])
-            known = tuple(int(x) for x in known_grid[i, :])
-            probs = self._row_probabilities(blocks, length=grid.shape[1], known=known)
+            known = tuple(-1 if certain_grid[i, c] == 0.5 else int(certain_grid[i, c]) for c in range(length))
+            probs = self._row_probabilities(blocks, length=length, known=known)
             if probs is None:
-                return None
-            if random.random() <= sampling_ratio * self.sampling_ratio_modifier:
-                output_grid[i, :] = probs
-        return output_grid
+                return None, None
+            probs_grid[i, :] = probs
+            for c in range(length):
+                if certain_grid[i, c] != 0.5:
+                    continue
+                if probs[c] >= 1.0:
+                    certain_grid[i, c] = 1.0
+                elif probs[c] <= 0.0:
+                    certain_grid[i, c] = 0.0
+        return certain_grid, probs_grid
 
-    def _step(
-        self, clues, initial_grid: np.ndarray, num_steps: int, sampling_ratio: float = 1.0
-    ) -> np.ndarray:
-        row_belief = initial_grid.copy()
-        col_belief = initial_grid.copy()
+    def _step(self, clues, prev: np.ndarray, sampling_ratio: float = 1.0) -> np.ndarray:
+        grid = prev.copy()
+        steps = []
 
-        combined0 = self._combine(row_belief, col_belief)
-        if combined0 is None:
-            combined0 = initial_grid.copy()
-        steps = [combined0]
+        row_certain, row_probs = self._loop_directions(grid, clues[0])
+        if row_certain is None:
+            print("Inconsistent clues or grid state encountered. DIRECTION: ROWS")
+            break
 
-        for _ in range(num_steps):
-            known_grid = ternarise(steps[-1], epsilon=0)
+        col_certain_T, col_probs_T = self._loop_directions(row_certain.T, clues[1])
+        if col_certain_T is None:
+            print("Inconsistent clues or grid state encountered. DIRECTION: COLUMNS")
+            break
+        col_certain = col_certain_T.T
+        col_probs = col_probs_T.T
 
-            row_grid = self._loop_directions(row_belief, clues[0], known_grid, sampling_ratio)
-            if row_grid is None:
-                print("Inconsistent clues or grid state encountered. DIRECTION: ROWS")
-                return np.stack(steps, axis=0)
+        confidence = self._combine(row_probs, col_probs)
+        display = col_certain.copy() if confidence is None else np.where(col_certain == 0.5, confidence, col_certain)
 
-            col_grid_T = self._loop_directions(col_belief.T, clues[1], known_grid.T, sampling_ratio)
-            if col_grid_T is None:
-                print("Inconsistent clues or grid state encountered. DIRECTION: COLUMNS")
-                return np.stack(steps, axis=0)
-            col_grid = col_grid_T.T
+        steps.append(display)
+        grid = display
 
-            combined = self._combine(row_grid, col_grid)
-            if combined is None:
-                print("Inconsistent clues or grid state encountered. DIRECTION: COMBINATION")
-                return np.stack(steps, axis=0)
-
-            row_belief = row_grid
-            col_belief = col_grid
-            steps.append(combined)
-        steps = steps[1:]
+        if not steps:
+            return np.empty((0,) + prev.shape, dtype=float)
         return np.stack(steps, axis=0)

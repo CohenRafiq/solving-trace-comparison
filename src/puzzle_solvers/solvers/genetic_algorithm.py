@@ -1,6 +1,6 @@
 import numpy as np
 
-from solvers.solvers import BaseSolver
+from puzzle_solvers.solvers.base import BaseSolver
 from utils.grid import batch_line_clues
 
 
@@ -111,7 +111,6 @@ class BaseGeneticAlgorithm(BaseSolver):
 
 class TournamentSelectionMixin:
     tournament_size: int = 3
-    default_step_ratio: int = 2
 
     def _select_parents(self, population, fitness_scores):
         num_samples, pop_size = fitness_scores.shape
@@ -128,8 +127,6 @@ class TournamentSelectionMixin:
 
 
 class ProportionateSelectionMixin:
-    default_step_ratio: int = 4
-
     def _select_parents(self, population, fitness_scores):
         num_samples, pop_size = fitness_scores.shape
         num_children = pop_size - (1 if getattr(self, "_uses_elitism", False) else 0)
