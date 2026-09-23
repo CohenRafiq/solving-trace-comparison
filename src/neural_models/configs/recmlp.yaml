@@ -20,8 +20,8 @@ val_dataset:
   padding_type: "positional"
 
 model:
-  # _target_: neural_models.models.recursive_mlp.RecursiveMLP
-  _target_: neural_models.models.recursive_grid_mlp.RecursiveGridMLP
+  _target_: neural_models.models.recursive_mlp.RecursiveMLP
+  # _target_: neural_models.models.recursive_grid_mlp.RecursiveGridMLP
 #   _target_: neural_models.models.recursive_cnn.RecursiveCNN
 #   _target_: neural_models.models.recursive_transformer.RecursiveTransformer
   hidden_size: 256

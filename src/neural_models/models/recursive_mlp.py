@@ -4,6 +4,22 @@ from torch import nn
 from neural_models.models.nng_embedding import CluePositionalEmb
 
 
+class ResidualBlock(nn.Module):
+    def __init__(self, hidden_size: int, dropout: float):
+        super().__init__()
+        self.block = nn.Sequential(
+            nn.Linear(hidden_size, hidden_size),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(hidden_size, hidden_size),
+            nn.GELU(),
+            nn.Dropout(dropout),
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.block(x) + x
+
+
 class RecursiveMLP(nn.Module):
     def __init__(
         self,
@@ -28,14 +44,7 @@ class RecursiveMLP(nn.Module):
             hidden_size=hidden_size,
             dropout=dropout,
         )
-        self.core = nn.Sequential(
-            nn.Linear(hidden_size, hidden_size),
-            nn.GELU(),
-            nn.Dropout(dropout),
-            nn.Linear(hidden_size, hidden_size),
-            nn.GELU(),
-            nn.Dropout(dropout),
-        )
+        self.core = ResidualBlock(hidden_size, dropout)
         answer_proj = [
             nn.Linear(hidden_size, hidden_size),
             nn.GELU(),
@@ -45,12 +54,19 @@ class RecursiveMLP(nn.Module):
             answer_proj.append(nn.Sigmoid())
         self.answer_proj = nn.Sequential(*answer_proj)
 
+    def embed(self, x: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
+        x = x.flatten(start_dim=1)  # Flatten the clues for embedding
+        return self.clue_embed(x, mask)
+
+    def unembed(self, x: torch.Tensor) -> torch.Tensor:
+        x = self.answer_proj(x)
+        return x.view(x.size(0), *self.output_shape)
+
     def forward(self, x: torch.Tensor, mask: torch.Tensor, layer_num: int | None = None
                 ) -> torch.Tensor:
-        x = x.flatten(start_dim=1)  # Flatten the clues for embedding
-        x = self.clue_embed(x, mask)
+        out = self.embed(x, mask)
+
         for _ in range(self.num_layers if layer_num is None else layer_num):
-            x = self.core(x) + x  # Residual connection
-        out = self.answer_proj(x)
-        out = out.view(out.size(0), *self.output_shape)  # Reshape to (batch, height, width)
-        return out
+            out = self.core(out)
+
+        return self.unembed(out)

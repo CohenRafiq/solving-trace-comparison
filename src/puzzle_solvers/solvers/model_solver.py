@@ -93,26 +93,23 @@ class ModelSolver(BaseSolver):
         return x.numpy()
 
     def _step(
-        self, clues: np.ndarray, prev: np.ndarray, num_steps: int, sampling_ratio: float
+        self, clues: np.ndarray, prev: np.ndarray, sampling_ratio: float
     ) -> np.ndarray:
-        grid_shape = prev.shape
-        if sampling_ratio < 1.0:
-            self.model.train()
-            for module in self.model.modules():
-                if isinstance(module, torch.nn.Dropout):
-                    module.p = 1.0 - sampling_ratio
-        else:
-            self.model.eval()
-        tensor_clues = (
+        self.model.eval()
+        with torch.no_grad():
+            self.residual_stream = self.model.core(self.residual_stream)
+        out = self.model.unembed(self.residual_stream)
+        return self._logits_to_grid(out, prev.shape)
+
+    def _first_step(self, clues: np.ndarray, grid_shape: tuple, sampling_ratio: float = 1.0) -> np.ndarray:
+        self.tensor_clues = (
             torch.from_numpy(np.ascontiguousarray(clues, dtype=np.float32))
             .unsqueeze(0)
             .to(self.device)
         )
-        mask = torch.ones_like(tensor_clues)
+        self.mask = self.tensor_clues != 0
+        self.model.eval()
         with torch.no_grad():
-            layer_logits = self.model.full_forward(tensor_clues, mask, layer_num=num_steps)
-        list_grids = [self._logits_to_grid(logits, grid_shape) for logits in layer_logits]
-        list_grids = list_grids[-num_steps:]
-        if not list_grids:
-            return np.array([np.asarray(prev)])
-        return np.array(list_grids)
+            self.residual_stream = self.model.embed(self.tensor_clues, self.mask)
+        out = self.model.unembed(self.residual_stream)
+        return self._logits_to_grid(out, grid_shape)

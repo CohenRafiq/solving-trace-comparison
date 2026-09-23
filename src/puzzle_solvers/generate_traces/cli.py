@@ -46,8 +46,8 @@ def build_parser() -> argparse.ArgumentParser:
         "-t",
         "--max-time",
         type=float,
-        default=3.0,
-        help="Wall-clock time budget per puzzle per solver (default: 3.0)",
+        default=2.0,
+        help="Wall-clock time budget per puzzle per solver (default: 2.0)",
     )
     parser.add_argument(
         "-w",

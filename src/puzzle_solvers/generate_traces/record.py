@@ -45,14 +45,6 @@ def make_puzzle_dict(dataset: NonogramsDataset, idx: int) -> dict:
     }
 
 
-def steps_to_solve(steps: np.ndarray, solution: np.ndarray) -> int:
-    sol_flat = np.asarray(solution).flatten()
-    for i, step in enumerate(steps):
-        if np.array_equal(np.round(step).flatten(), sol_flat):
-            return i
-    return len(steps)
-
-
 def compute_run_losses(
     steps: np.ndarray, clues: np.ndarray, solution: np.ndarray
 ) -> tuple[list, list]:
@@ -83,7 +75,6 @@ def make_run_record(
     cr_losses, mse_losses = compute_run_losses(steps, clues, solution)
     return {
         "steps": [step for step in steps],
-        "steps_to_solve": steps_to_solve(steps, solution),
         "cr_losses": cr_losses,
         "mse_losses": mse_losses,
         "num_steps": num_steps,

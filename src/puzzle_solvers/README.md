@@ -34,7 +34,6 @@
 
 ### TODO
 - parallelism
-- search
 - MAC heuristics
 - constraint programming
 - variable elimination

@@ -134,27 +134,29 @@ class MAC(BaseSolver):
         return certain_grid, probs_grid
 
     def _step(self, clues, prev: np.ndarray, sampling_ratio: float = 1.0) -> np.ndarray:
-        grid = prev.copy()
-        steps = []
-
-        row_certain, row_probs = self._loop_directions(grid, clues[0])
+        row_certain, row_probs = self._loop_directions(prev.copy(), clues[0])
         if row_certain is None:
             print("Inconsistent clues or grid state encountered. DIRECTION: ROWS")
-            break
+            return prev
 
-        col_certain_T, col_probs_T = self._loop_directions(row_certain.T, clues[1])
+        col_certain_T, col_probs_T = self._loop_directions(prev.copy().T, clues[1])
         if col_certain_T is None:
             print("Inconsistent clues or grid state encountered. DIRECTION: COLUMNS")
-            break
+            return prev
         col_certain = col_certain_T.T
         col_probs = col_probs_T.T
+        
+        row_forced = row_certain != 0.5
+        col_forced = col_certain != 0.5
+        conflict = row_forced & col_forced & (row_certain != col_certain)
+        if conflict.any():
+            print("Inconsistent clues or grid state encountered. DIRECTION: ROWS vs COLUMNS")
+            return prev
+
+        merged_certain = np.where(row_forced, row_certain, np.where(col_forced, col_certain, 0.5))
 
         confidence = self._combine(row_probs, col_probs)
-        display = col_certain.copy() if confidence is None else np.where(col_certain == 0.5, confidence, col_certain)
-
-        steps.append(display)
-        grid = display
-
-        if not steps:
-            return np.empty((0,) + prev.shape, dtype=float)
-        return np.stack(steps, axis=0)
+        return merged_certain.copy() if confidence is None else np.where(merged_certain == 0.5, confidence, merged_certain)
+    def _first_step(self, clues: np.ndarray, grid_shape: tuple[int, int], sampling_ratio: float = 1.0) -> np.ndarray:
+        initial_grid = np.full(grid_shape, 0.5, dtype=np.float32)
+        return initial_grid

@@ -70,7 +70,7 @@ class RecursiveGridMLP(nn.Module):
             dropout=dropout,
         )
 
-        self.residual_block = GridResidualBlock(
+        self.core = GridResidualBlock(
             output_size=self.output_size,
             hidden_size=hidden_size,
             dropout=dropout,
@@ -86,32 +86,20 @@ class RecursiveGridMLP(nn.Module):
             answer_proj.append(nn.Sigmoid())
         self.answer_proj = nn.Sequential(*answer_proj)
 
-    def _embed(self, x: Tensor, mask: Tensor) -> Tensor:
+    def embed(self, x: Tensor, mask: Tensor) -> Tensor:
         x = x.flatten(start_dim=1)
         context = self.clue_embed(x, mask)  # (B, hidden_size)
         batch_grid = self.grid.expand(context.size(0), -1)
         return torch.cat([batch_grid, context], dim=-1)
 
+    def unembed(self, x: torch.Tensor) -> torch.Tensor:
+        x = self.answer_proj(x)
+        return x.view(x.size(0), *self.output_shape)
+
     def forward(self, x: Tensor, mask: Tensor, layer_num: int | None = None) -> Tensor:
-        out = self._embed(x, mask)
+        out = self.embed(x, mask)
 
         for _ in range(self.num_layers if layer_num is None else layer_num):
-            out = self.residual_block(out)
+            out = self.core(out)
 
-        out = self.answer_proj(out)
-        return out.view(out.size(0), *self.output_shape)
-
-    def full_forward(
-        self, x: Tensor, mask: Tensor, layer_num: int | None = None
-    ) -> list[Tensor]:
-        out = self._embed(x, mask)
-
-        layers_outputs = [out]
-        for _ in range(self.num_layers if layer_num is None else layer_num):
-            out = self.residual_block(out)
-            layers_outputs.append(out)
-
-        return [
-            self.answer_proj(layer_out).view(layer_out.size(0), *self.output_shape)
-            for layer_out in layers_outputs
-        ]
+        return self.unembed(out)

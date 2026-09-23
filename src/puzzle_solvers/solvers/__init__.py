@@ -1,7 +1,7 @@
 from puzzle_solvers.solvers.base import BaseSolver, StoppingReason
 from puzzle_solvers.solvers.genetic_algorithm import (
-    GeneticAlgorithmDEP,
-    GeneticAlgorithmDET,
+    GeneticTournament,
+    GeneticProportionate,
 )
 from puzzle_solvers.solvers.gradient_descent import (
     GDBangBangSolver,
@@ -35,11 +35,11 @@ __all__ = [
 
 SOLVERS = {
     "mac": MAC,
-    "genetic_algorithm_det": GeneticAlgorithmDET,
-    "genetic_algorithm_dep": GeneticAlgorithmDEP,
-    "gradient_descent_global_adam": GDGlobalAdamSolver,
-    "gradient_descent_global_sgd": GDGlobalSGDSolver,
-    "gradient_descent_bang_bang": GDBangBangSolver,
+    "genetic_tournament": GeneticTournament,
+    "genetic_proportionate": GeneticProportionate,
+    "gd_adam": GDGlobalAdamSolver,
+    "gd_sgd": GDGlobalSGDSolver,
+    "gd_bangbang": GDBangBangSolver,
     # "gradient_descent_gauss_seidel_adam": GDGaussSeidelAdamSolver,
     # "gradient_descent_gauss_seidel_sgd": GDGaussSeidelSGDSolver,
     # "gradient_descent_jacobi_adam": GDJacobiAdamSolver,

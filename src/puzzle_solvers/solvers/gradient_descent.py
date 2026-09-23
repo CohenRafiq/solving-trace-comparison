@@ -54,25 +54,23 @@ class BaseGradientDescentSolver(BaseSolver):
         raise NotImplementedError
 
     def _step(
-        self, clues: np.ndarray, prev: np.ndarray, num_steps: int, sampling_ratio: float = 1.0
+        self, clues: np.ndarray, prev: np.ndarray, sampling_ratio: float = 1.0
     ) -> np.ndarray:
-        if not self._optimizer_state_ready:
-            self._reset_state(clues, prev)
 
         prev_t = torch.tensor(prev, dtype=torch.float32, device=self.device)
         prev_t = torch.clamp(prev_t, 1e-6, 1 - 1e-6)
         logit_grid = torch.logit(prev_t, eps=1e-6)
 
-        steps_torch = [logit_grid]
         n = logit_grid.numel()
+        new_logits = self._optimise(logit_grid, n, sampling_ratio, self._clues_t)
 
-        for _ in range(num_steps):
-            current = steps_torch[-1]
-            new_logits = self._optimise(current, n, sampling_ratio, self._clues_t)
-            steps_torch.append(new_logits)
+        new_grid = torch.sigmoid(new_logits).detach().cpu().numpy()
+        return new_grid
 
-        steps = [torch.sigmoid(step).detach().cpu().numpy() for step in steps_torch[1:]]
-        return np.array(steps)
+    def _first_step(self, clues: np.ndarray, grid_shape: tuple, sampling_ratio: float = 1.0) -> np.ndarray:
+        initial_grid = np.full(grid_shape, 0.5, dtype=np.float32)
+        self._reset_state(clues, initial_grid)
+        return initial_grid
 
 
 # =============================================================================

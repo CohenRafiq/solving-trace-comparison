@@ -113,10 +113,19 @@ class BacktrackingSearch(BaseSolver):
                 self._stack[-1][2] = idx + 1
 
     def _step(
-        self, clues: np.ndarray, prev: np.ndarray, num_steps: int, sampling_ratio: float
+        self, clues: np.ndarray, prev: np.ndarray, sampling_ratio: float = 1.0
     ) -> np.ndarray:
-        if not hasattr(self, "_grid"):
-            self._reset_state(clues, prev)
-        self._advance(max(1, num_steps))
+        self._advance(1)
         out = np.where(self._grid == -1, 0.5, self._grid.astype(float))
-        return np.array([out])
+        return out
+
+    def _first_step(
+        self, clues: np.ndarray, grid_shape: tuple[int, int], sampling_ratio: float = 1.0
+    ) -> np.ndarray:
+        self._clues = np.asarray(clues)
+        self._grid = np.full(grid_shape, -1, dtype=int)
+        self._stack: list[list[int | bool]] = []
+        self._values: dict[tuple[int, int], list[int]] = {}
+        self._advance(1)
+        out = np.where(self._grid == -1, 0.5, self._grid.astype(float))
+        return out

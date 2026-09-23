@@ -4,7 +4,7 @@ from enum import Enum
 
 import numpy as np
 
-from utils.grid import blank_grid, grid_shape_from_clues, normalise_clues
+from utils.grid import normalise_clues
 
 
 class StoppingReason(Enum):
@@ -21,14 +21,16 @@ class BaseSolver(ABC):
         super().__init__()
 
     def keep_solving(
-        self, prev: np.ndarray, nxt: np.ndarray, correct: np.ndarray, eps: float = 1e-3
+        self, next: np.ndarray, prev_steps: list[np.ndarray], correct: np.ndarray, eps: float = 5e-3
     ) -> StoppingReason:
-        pred_prev = np.round(prev).flatten()
-        pred_next = np.round(nxt).flatten()
+        pred_next = next.copy()
+        pred_next[next == 0.5] = -1
+        pred_next = np.round(pred_next).flatten()
         if np.array_equal(pred_next, np.asarray(correct).flatten()):
             return StoppingReason.SOLVED
-        if np.isclose(prev, nxt, atol=eps).all() and np.array_equal(pred_prev, pred_next):
-            return StoppingReason.NO_CHANGE
+        for prev in prev_steps:
+            if np.isclose(prev, next, atol=eps).all() and np.array_equal(np.round(prev).flatten(), pred_next):
+                return StoppingReason.NO_CHANGE
         return StoppingReason.NOT_STOPPED
 
     def solve(
@@ -41,33 +43,31 @@ class BaseSolver(ABC):
         if max_time is None:
             max_time = self.default_max_time
         clues_arr = np.asarray(clues)
-        grid_shape = grid_shape_from_clues(clues_arr)
         clues_arr = normalise_clues(clues_arr)
-        prev = blank_grid(*grid_shape)
-
-        self._reset_state(clues_arr, prev)
 
         steps = []
         stopping_reason = StoppingReason.TIMEOUT
         deadline = time.monotonic() + max_time
+        prev = self._first_step(clues_arr, solution.shape, sampling_ratio=sampling_ratio)
         while time.monotonic() < deadline:
-            traj = self._step(clues_arr, prev, num_steps=1, sampling_ratio=sampling_ratio)
-            if len(traj) == 0:
-                break
-            nxt = traj[-1]
-            steps.append(nxt)
-            stopping = self.keep_solving(prev, nxt, solution)
+            next = self._step(clues_arr, prev, sampling_ratio=sampling_ratio)
+            stopping = self.keep_solving(next, steps, solution)
+            steps.append(next)
             if stopping != StoppingReason.NOT_STOPPED:
                 stopping_reason = stopping
                 break
-            prev = nxt
+            prev = next
         return np.array(steps), len(steps), stopping_reason
 
-    def _reset_state(self, clues: np.ndarray, prev: np.ndarray) -> None:
-        del clues, prev
 
     @abstractmethod
     def _step(
-        self, clues: np.ndarray, prev: np.ndarray, sampling_ratio: float
+        self, clues: np.ndarray, prev: np.ndarray, sampling_ratio: float = 1.0
+    ) -> np.ndarray:
+        pass
+
+    @abstractmethod
+    def _first_step(
+        self, clues: np.ndarray, grid_shape: tuple[int, int], sampling_ratio: float = 1.0
     ) -> np.ndarray:
         pass
