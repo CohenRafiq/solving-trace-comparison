@@ -29,7 +29,7 @@ class BaseSolver(ABC):
         if np.array_equal(pred_next, np.asarray(correct).flatten()):
             return StoppingReason.SOLVED
         for prev in prev_steps:
-            if np.isclose(prev, next, atol=eps).all() and np.array_equal(np.round(prev).flatten(), pred_next):
+            if np.isclose(prev, next, atol=eps).all() and np.array_equal(np.round(prev).flatten(), np.round(next).flatten()):
                 return StoppingReason.NO_CHANGE
         return StoppingReason.NOT_STOPPED
 
