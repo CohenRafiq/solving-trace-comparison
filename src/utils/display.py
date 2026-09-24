@@ -41,7 +41,7 @@ def display_blended(ax, grid, clues=None, title=""):
         [
             [1.0, 1.0, 1.0],  # empty (0) → white
             [0.0, 0.0, 0.0],  # filled (1) → black
-            [0.0, 0.0, 0.5],  # unknown (-1) → blue
+            [0.0, 0.0, 1.0],  # unknown (-1) → blue
         ]
     )  
 

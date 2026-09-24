@@ -14,3 +14,6 @@ Experiments TODO
     - does it generalise better
     - how similar are traces on unseen puzzles
     - how similar on larger puzzles
+- does model know when it is wrong?
+    - are incorrect ones on all high abstain cells
+    - is abstain value high when p(0) ~= p(1)
