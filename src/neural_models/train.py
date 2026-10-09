@@ -48,8 +48,12 @@ class Trainer:
                 total_acc += (predictions == targets).flatten(1).all(dim=1).float().mean()
                 if type(self.criterion).__name__ == "AbstainLoss":
                     # Calculate abstain rate
-                    abstain_rate = (outputs.argmax(dim=1) == outputs.shape[1] - 1).float().mean().item()
-                    additional_metrics["abstain_rate"] = additional_metrics.get("abstain_rate", 0) + abstain_rate
+                    abstain_rate = (
+                        (outputs.argmax(dim=1) == outputs.shape[1] - 1).float().mean().item()
+                    )
+                    additional_metrics["abstain_rate"] = (
+                        additional_metrics.get("abstain_rate", 0) + abstain_rate
+                    )
                 n += 1
         for key in additional_metrics:
             additional_metrics[key] /= n

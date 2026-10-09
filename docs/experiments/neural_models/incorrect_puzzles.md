@@ -28,6 +28,6 @@ Interestingly we can see the model has some depeer understanding of the rules. T
 
 ### Uncertain Predictions
 
-When we introduce the ability to abstain (blue) it works as a measure of how confident the model is with each cell. We can see that the errors the model makes are almost always in places of high uncertainty
+When we introduce the ability to abstain (blue) it works as a measure of how confident the model is with each cell. We can see that the errors the model makes are almost always in places of high uncertainty.
 
 ![Uncertain Predictions](../../assets/nng_grid_uncertain_predictions.png)

@@ -26,8 +26,8 @@ def build_parser() -> argparse.ArgumentParser:
         "-o",
         "--output",
         type=str,
-        default=None,
-        help="Output JSONL path (default: data/traces_dataset/nonograms/test.jsonl)",
+        default="test.jsonl",
+        help="Output JSONL path (default: test.jsonl)",
     )
     parser.add_argument(
         "-n",
@@ -77,16 +77,5 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> dict:
     args = build_parser().parse_args(argv)
-    config = TracesConfig(
-        data_dir=args.data_dir,
-        input_path=args.input,
-        output_path=args.output,
-        max_size=args.max_size,
-        solvers=args.solvers,
-        max_time=args.max_time,
-        n_workers=args.workers,
-        batch_size=args.batch_size,
-        chunksize=args.chunksize,
-        model_path=args.model_path,
-    )
+    config = TracesConfig(**vars(args))
     return run(config)

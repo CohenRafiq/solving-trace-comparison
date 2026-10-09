@@ -1,4 +1,4 @@
+from .display import display_blended, display_grid
 from .null_target import NullTarget
-from .display import display_grid, display_blended
 
-__all__ = ["get_next_model_number", "save_model", "NullTarget"]
+__all__ = ["display_blended", "display_grid", "get_next_model_number", "save_model", "NullTarget"]

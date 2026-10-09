@@ -250,12 +250,12 @@ if __name__ == "__main__":
     grid_bin, clues = make_synthetic_puzzle(B, side, K, seed=1)
 
     criterion = ClueReconstructionLoss(
-        reduction="mean",
-        aux_weight_start=0.0,
-        aux_weight_end=0.15,
-        entropy_weight_start=0.05,
-        entropy_weight_end=0.0,
-        anneal_steps=1500,
+        # reduction="mean",
+        # aux_weight_start=0.0,
+        # aux_weight_end=0.15,
+        # entropy_weight_start=0.05,
+        # entropy_weight_end=0.0,
+        # anneal_steps=1500,
     )
 
     check_optimal_loss(criterion, grid_bin, clues)

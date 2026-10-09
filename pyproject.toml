@@ -10,7 +10,7 @@ build-backend = "hatchling.build"
 requires = ["hatchling"]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/neural_models", "src/solvers", "src/puzzle_solvers", "src/trace_comparison", "src/utils", "src/base_dataset"]
+packages = ["src/neural_models", "src/puzzle_solvers", "src/trace_comparison", "src/utils", "src/base_dataset"]
 
 [tool.pixi.workspace]
 channels = ["conda-forge"]

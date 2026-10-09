@@ -3,10 +3,8 @@ import math
 import torch
 import torch.nn.functional as F
 
-from neural_models_old.criterion.base import BaseCriterion
 
-
-class ClueReconstructionLoss(BaseCriterion):
+class ClueReconstructionLoss(torch.nn.Module):
     clue_indices_template: torch.Tensor
 
     def __init__(self, reduction: str = "mean"):

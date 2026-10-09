@@ -3,11 +3,12 @@ import json
 import re
 from datetime import UTC, datetime
 from pathlib import Path
-from omegaconf import DictConfig
-from neural_models.logger import Logger
 
 import torch
+from omegaconf import DictConfig
 from torch import nn
+
+from neural_models.logger import Logger
 
 try:
     from omegaconf import OmegaConf

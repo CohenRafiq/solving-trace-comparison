@@ -43,7 +43,7 @@ def display_blended(ax, grid, clues=None, title=""):
             [0.0, 0.0, 0.0],  # filled (1) → black
             [0.0, 0.0, 1.0],  # unknown (-1) → blue
         ]
-    )  
+    )
 
     flat_weights = smooth.reshape(-1, 3)
     blended_flat = flat_weights @ base_colours

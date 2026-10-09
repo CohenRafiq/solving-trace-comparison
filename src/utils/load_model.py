@@ -1,12 +1,11 @@
 import os
 
 import torch
-
-from neural_models_old.models.base import BaseModel
+from torch import nn
 
 
 def load_model(
-    model_class: type[BaseModel],
+    model_class: type[nn.Module],
     model_weight_path: str | os.PathLike,
     device: torch.device,
     **model_params,

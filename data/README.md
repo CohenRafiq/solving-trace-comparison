@@ -85,47 +85,43 @@ Current
     "mean_clue_runs": 1.5
   },
   "traces": {
-    "mac": {
-      "1.0": [{
-        "steps": [
-          [[0.25, 0.5, 1.0, 0.2, 0.2],
-           [0.5, 0.333, 0.0, 0.2, 0.2],
-           [0.5, 0.333, 1.0, 0.2, 0.2],
-           [0.2, 0.111, 1.0, 0.059, 0.059],
-           [0.1, 0.5, 1.0, 0.2, 0.077]],
-          … 15 steps total, converging to the "grid" …
+    "mac": [{
+      "steps": [
+        [[0.25, 0.5, 1.0, 0.2, 0.2],
+         [0.5, 0.333, 0.0, 0.2, 0.2],
+         [0.5, 0.333, 1.0, 0.2, 0.2],
+         [0.2, 0.111, 1.0, 0.059, 0.059],
+         [0.1, 0.5, 1.0, 0.2, 0.077]],
+        … 15 steps total, converging to the "grid" …
+      ],
+      "steps_to_solve": 5,
+      "cr_losses": [0.995, 0.947, 0.930, …, 0.929],
+      "mse_losses": [0.127, 0.080, 0.049, 0.020, 0.0, …, 0.0],
+      "num_steps": 15,
+      "solved": true,
+      "step_ratio": 2
+    }],
+    "genetic_algorithm_det": [{
+      "steps": [
+        [[0.506, 0.513, 0.519, 0.497, 0.512],
+         [0.506, 0.510, 0.470, 0.526, 0.479],
+         … 5×5 grid per step, 15 steps …
         ],
-        "steps_to_solve": 5,
-        "cr_losses": [0.995, 0.947, 0.930, …, 0.929],
-        "mse_losses": [0.127, 0.080, 0.049, 0.020, 0.0, …, 0.0],
-        "num_steps": 15,
-        "solved": true,
-        "step_ratio": 2
-      }]
-    },
-    "genetic_algorithm_det": {
-      "1.0": [{
-        "steps": [
-          [[0.506, 0.513, 0.519, 0.497, 0.512],
-           [0.506, 0.510, 0.470, 0.526, 0.479],
-           … 5×5 grid per step, 15 steps …
-          ],
-          …
-        ],
-        "steps_to_solve": 7,
-        "cr_losses": [1.280, 1.195, …, 0.936],
-        "mse_losses": [0.247, 0.193, …, 0.0001],
-        "num_steps": 15,
-        "solved": true,
-        "step_ratio": 2
-      }]
-    },
-    "genetic_algorithm_dep": { "1.0": [{ … }] },
-    "gradient_descent_global_adam": { "1.0": [{ … }] },
-    "gradient_descent_global_sgd": { "1.0": [{ … }] },
-    "gradient_descent_bang_bang": { "1.0": [{ … }] },
-    "model_solver": { "1.0": [{ … }] },
-    "backtracking_search": { "1.0": [{ … }] }
+        …
+      ],
+      "steps_to_solve": 7,
+      "cr_losses": [1.280, 1.195, …, 0.936],
+      "mse_losses": [0.247, 0.193, …, 0.0001],
+      "num_steps": 15,
+      "solved": true,
+      "step_ratio": 2
+    }],
+    "genetic_algorithm_dep": [{ … }],
+    "gradient_descent_global_adam": [{ … }],
+    "gradient_descent_global_sgd": [{ … }],
+    "gradient_descent_bang_bang": [{ … }],
+    "model_solver": [{ … }],
+    "backtracking_search": [{ … }]
   }
 }
 ```

@@ -1,6 +1,7 @@
 import torch
 from torch import nn
 
+
 class CluePositionalEmb(nn.Module):
     """Positional embedding for clues with masking"""
 
