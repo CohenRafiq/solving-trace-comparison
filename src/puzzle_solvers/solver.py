@@ -1,16 +1,18 @@
-from dataclasses import dataclass
-import time 
+import time
+from dataclasses import dataclass, replace
 from typing import Literal
-import numpy as np
 
-from puzzle_solvers.types import (
-    StoppingReason, Strategy, State, Aggregator
-)
+import numpy as np
+from hydra.utils import instantiate
+from omegaconf import DictConfig
+
+from puzzle_solvers.types import Aggregator, State, StoppingReason, Strategy
 
 
 @dataclass(frozen=True)
 class Solver:
     """A solver is a combination of a strategy, state, and aggregator."""
+
     name: str
     strategy: Strategy
     state: State
@@ -20,73 +22,72 @@ class Solver:
     solved_threshold: float = 0.2
     stopping_threshold: float = 1e-3
 
-    def _early_stop(self, curr_pred: np.ndarray, prev_pred: np.ndarray, solution: np.ndarray) -> StoppingReason:
-        prev_r = np.round(prev_pred).flatten()
-        curr_r = np.round(curr_pred).flatten()
+    def _is_solved(self, curr_pred: np.ndarray, solution: np.ndarray) -> bool:
         match self.stopping_condition:
             case "rounded":
-                if np.array_equal(curr_r, solution.flatten()):
-                    return StoppingReason.SOLVED
+                return bool(np.array_equal(np.round(curr_pred).flatten(), solution.flatten()))
             case "close":
-                if np.allclose(curr_pred, solution, atol=self.solved_threshold):
-                    return StoppingReason.SOLVED
+                return bool(np.allclose(curr_pred, solution, atol=self.solved_threshold))
             case _:
                 raise ValueError(f"Unknown stopping_condition: {self.stopping_condition}")
 
-        if (np.isclose(prev_pred, curr_pred, atol=self.stopping_threshold).all()
-             and np.array_equal(prev_r, curr_r)):
-            return StoppingReason.NO_CHANGE
+    def _has_stalled(self, prev_raw: np.ndarray, curr_raw: np.ndarray) -> bool:
+        return bool(np.isclose(prev_raw, curr_raw, atol=self.stopping_threshold).all())
 
-        return StoppingReason.NOT_STOPPED
-
-    def solve(self, clues: np.ndarray, solution: np.ndarray, max_time: float) -> tuple[np.ndarray, int, StoppingReason]:
-        state = self.state.initialise(clues, solution.shape, seed=self.seed)
-        solving_traces = []
+    def solve(
+        self, clues: np.ndarray, solution: np.ndarray, max_time: float
+    ) -> tuple[np.ndarray, int, StoppingReason]:
+        """Solve the puzzle with the given clues and solution within the time limit."""
+        flat_clues = np.asarray(clues, dtype=np.float32).reshape(1, -1)
+        state = self.state.initialise(clues, solution.shape)
+        solving_traces: list[np.ndarray] = []
+        prev_raw = None
         finish_time = time.monotonic() + max_time
         while time.monotonic() < finish_time:
             state = self.strategy(state)
-            curr_pred = self.aggregator(self.state.grids, clues)
+            curr_pred = self.aggregator(state.grids, flat_clues)
+            curr_raw = state.raw_grids
             solving_traces.append(curr_pred)
-            if len(solving_traces) <= 1:
-                continue
-            prev_pred = solving_traces[-2]
-            stopping_reason = self._early_stop(curr_pred, prev_pred, solution)
-            if stopping_reason != StoppingReason.NOT_STOPPED:
-                return np.array(solving_traces), len(solving_traces), stopping_reason
+            if len(solving_traces) > 1:
+                if self._is_solved(curr_pred, solution):
+                    return np.array(solving_traces), len(solving_traces), StoppingReason.SOLVED
+                if prev_raw is not None and self._has_stalled(prev_raw, curr_raw):
+                    return np.array(solving_traces), len(solving_traces), StoppingReason.NO_CHANGE
+            prev_raw = curr_raw
         return np.array(solving_traces), len(solving_traces), StoppingReason.TIMEOUT
+
+    def with_seed(self, seed: int) -> "Solver":
+        """A copy whose state draws from `seed` instead of the configured one."""
+        return replace(self, state=replace(self.state, seed=seed))
 
     def describe(self) -> dict:
         return {
             "name": self.name,
-            "strategy": self.strategy.__class__.__name__,
-            "state": self.state.__class__.__name__,
-            "aggregator": self.aggregator.__class__.__name__,
+            "strategy": type(self.strategy).__name__,
+            "state": type(self.state).__name__,
+            "aggregator": type(self.aggregator).__name__,
             "seed": self.seed,
             "stopping_condition": self.stopping_condition,
             "solved_threshold": self.solved_threshold,
             "stopping_threshold": self.stopping_threshold,
         }
-    
-# def _load_class_with_kwargs(registry: dict, config: dict, key: str):
-#     cls_name = config[key]["name"]
-#     cls_kwargs = {k: v for k, v in config[key].items() if k != "name"}
-#     cls = registry[cls_name]
-#     return cls(**cls_kwargs)
 
-# def build_solver(name: str, config: dict) -> Solver:
-#     strategy = _load_class_with_kwargs(STRATEGIES, config, "strategy")
-#     state = _load_class_with_kwargs(STATES, config, "state")
-#     renderer = _load_class_with_kwargs(RENDERERS, config, "renderer")
-#     aggregation = _load_class_with_kwargs(AGGREGATORS, config, "aggregation")
 
-#     return Solver(
-#         name=name,
-#         strategy=strategy,
-#         state=state,
-#         renderer=renderer,
-#         aggregation=aggregation,
-#         seed=config.get("seed"),
-#         stopping_condition=config.get("stopping_condition", "close"),
-#         solved_threshold=config.get("solved_threshold", 0.2),
-#         stopping_threshold=config.get("stopping_threshold", 1e-3),
-#     )
+SOLVER_KEYS = ("name", "strategy", "state", "aggregator")
+
+
+def build_solver(cfg: DictConfig) -> Solver:
+    missing = [k for k in SOLVER_KEYS if k not in cfg]
+    if missing:
+        raise KeyError(f"solver config is missing {missing}; got keys {list(cfg)}")
+
+    return Solver(
+        name=cfg.name,
+        strategy=instantiate(cfg.strategy),
+        state=instantiate(cfg.state),
+        aggregator=instantiate(cfg.aggregator),
+        seed=cfg.get("seed"),
+        stopping_condition=cfg.get("stopping_condition", "close"),
+        solved_threshold=cfg.get("solved_threshold", 0.2),
+        stopping_threshold=cfg.get("stopping_threshold", 1e-3),
+    )

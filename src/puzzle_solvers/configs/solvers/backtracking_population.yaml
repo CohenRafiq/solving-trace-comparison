@@ -1,0 +1,11 @@
+backtracking_population:
+  name: backtracking_population
+  strategy:
+    _target_: puzzle_solvers.solvers.backtracking_search.BSStrategy
+  state:
+    _target_: puzzle_solvers.solvers.backtracking_search.BSState
+    k: 100
+    seed: 42
+  aggregator:
+    _target_: puzzle_solvers.aggregation.MeanAggregator
+    unknown_handling: replace

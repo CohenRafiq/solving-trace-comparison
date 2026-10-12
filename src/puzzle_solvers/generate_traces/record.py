@@ -2,9 +2,8 @@ import numpy as np
 import torch
 
 from neural_models.dataset import NonogramsDataset
-from old.solvers.base import StoppingReason
-from old.solvers.criterion import grid_losses
-
+from ..types import StoppingReason
+from ..losses.clue_reconstruction_loss import ClueReconstructionLoss
 
 def to_serialisable(x):
     if torch.is_tensor(x):
@@ -34,7 +33,6 @@ def make_puzzle_dict(dataset: NonogramsDataset, idx: int) -> dict:
         },
     }
 
-
 def compute_run_losses(
     steps: np.ndarray, clues: np.ndarray, solution: np.ndarray
 ) -> tuple[list, list]:
@@ -42,22 +40,21 @@ def compute_run_losses(
     n = len(steps)
     if n == 0:
         return [], []
-    cr_losses = grid_losses(np.asarray(steps).reshape(n, -1), clues).tolist()
+    cr_losses = ClueReconstructionLoss.evaluate(np.asarray(steps).reshape(n, -1), clues).tolist()
     sol_flat = np.asarray(solution).reshape(1, -1)
     mse_losses = np.mean((np.asarray(steps).reshape(n, -1) - sol_flat) ** 2, axis=1).tolist()
     return cr_losses, mse_losses
 
 
 def make_run_record(
-    steps: np.ndarray,
-    num_steps: int,
-    reason: StoppingReason,
-    clues: np.ndarray,
-    solution: np.ndarray,
+    steps: np.ndarray, num_steps: int, reason: StoppingReason,
+    clues: np.ndarray, solution: np.ndarray,
 ) -> dict:
     cr_losses, mse_losses = compute_run_losses(steps, clues, solution)
     return {
         "steps": [step for step in steps],
+        "clues": clues,
+        "solution": solution,
         "cr_losses": cr_losses,
         "mse_losses": mse_losses,
         "num_steps": num_steps,

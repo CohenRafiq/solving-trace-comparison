@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import replace
+
 import numpy as np
 
 from ...types import Strategy
-from ..utils.const import UNKNOWN, EMPTY, FILLED
+from ..utils.const import EMPTY, FILLED, UNKNOWN
 from ..utils.line_checking import consistent_at_cell
 from .state import BSState, Decision
 
@@ -21,7 +22,7 @@ class BSStrategy(Strategy):
                 self._commit_one(grid[i], stack, state.clue_blocks, state.rng)
             stacks.append(tuple(stack))
 
-        return replace(state, grid=grid, stack=tuple(stacks), step=state.step + 1)
+        return replace(state, pop_of_grids=grid, stack=tuple(stacks), step=state.step + 1)
 
     def _commit_one(self, grid: np.ndarray, stack: list[Decision], blocks: tuple, rng: np.random.Generator) -> None:
         d = self._pick(grid, rng)

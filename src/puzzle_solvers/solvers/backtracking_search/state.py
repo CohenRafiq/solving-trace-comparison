@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field, replace
 import numpy as np
 
+from utils.grid import clues_to_tuples
 from ...types import State
 from ..utils.const import UNKNOWN, EMPTY, FILLED, empty_int8
 
@@ -38,10 +39,6 @@ class BSState(State):
     def _init_params(self, padded_clues: np.ndarray, grid_shape: tuple[int, int]) -> dict:
         return {
             "pop_of_grids": np.full((self.k, *grid_shape), UNKNOWN, dtype=np.int8),
-            "clue_blocks": self._clues_to_tuples(padded_clues),
+            "clue_blocks": clues_to_tuples(padded_clues),
             "stack": tuple(() for _ in range(self.k)),
         }
-
-    @property
-    def grids(self) -> np.ndarray:
-        return self.pop_of_grids.astype(np.float64)

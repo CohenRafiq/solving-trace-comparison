@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-import numpy as np
 from abc import ABC, abstractmethod
 from dataclasses import replace
+
+import numpy as np
 
 from ...types import Strategy
 from ..utils.const import EMPTY, FILLED
@@ -11,7 +12,7 @@ from .state import ACState
 
 
 class _ACBaseStrategy(Strategy, ABC):
-    
+
     @abstractmethod
     def _step_member(self, rng: np.random.Generator, grid: np.ndarray, blocks: tuple) -> bool:
         ...
@@ -23,7 +24,7 @@ class _ACBaseStrategy(Strategy, ABC):
         if not any(moved):
             return state
 
-        return replace(state, grid=grid, step=state.step + 1)
+        return replace(state, pop_of_grids=grid, step=state.step + 1)
 
 
 

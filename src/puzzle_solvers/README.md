@@ -1,66 +1,92 @@
 ## Solvers
 
 ### About
-- Time-budgeted nonogram solvers, all built from one `Anatomy` by picking a value
-  on each of four independent axes.
-- `BaseSolver.solve(clues, solution, max_time, seed)` runs
-  iteratively until the puzzle is solved, progress stalls, or the wall-clock
-  deadline is hit. It returns `(steps, len(steps), StoppingReason)`.
-- There are no per-solver subclasses and no solver-held state. `reset(problem)`
-  returns a `State` and `advance(state, problem)` returns a *new* one, so one
+- Time-budgeted nonogram solvers, each assembled from three independent parts:
+  a `State`, a `Strategy`, and an `Aggregator`.
+- `Solver.solve(clues, solution, max_time)` runs iteratively until the puzzle is
+  solved, progress stalls, or the wall-clock deadline is hit. It returns
+  `(steps, len(steps), StoppingReason)`.
+- There are no per-solver subclasses and no solver-held state. `State` is a
+  frozen dataclass and `Strategy.__call__(state)` returns a *new* one, so one
   instance can be reused across puzzles without leaking anything between them.
-  `solve` is the driver that turns that pair into a trace, and is the only thing
-  `generate_traces` needs to know about.
+- A solver is a **config file**, not a class: `configs/solvers/<name>.yaml`
+  names the three parts and hydra instantiates them.
 - The `generate_traces` package builds a trace dataset from a base dataset
   (`data/base_dataset/nonograms`) using the `NonogramsDataset` reader. Run it
   with `python -m puzzle_solvers.generate_traces` (see `data/README.md` for the
   dataset format).
 
-### The four axes
-A solver is a row in the declarative registry, not a class:
+### The three axes
+A solver is a row in a declarative config group, not a class:
 
-| axis | values |
+| axis | classes |
 | --- | --- |
-| proposal | `belief_propagation`, `gradient_descent`, `evolutionary`, `backtracking`, `recursive_model` |
-| schedule | `global`, `parallel`, `sequential`, `local` |
-| aggregation | `identity`, `mean(k)`, `cr_weighted_mean(k)` |
-| coupling | `none`, `evolutionary` |
+| state | `ACState`, `BSState`, `GAState`, `GDSGDState`, `GDAdamState`, `NNState` |
+| strategy | `ACParallelStrategy`, `ACPerLineStrategy`, `BSStrategy`, `GATournamentStrategy`, `GARankStrategy`, `GARouletteStrategy`, `GDStrategy`, `NNStrategy` |
+| aggregator | `FirstAggregator`, `MeanAggregator`, `WeightedMeanAggregator` |
 
-Add a solver by adding a row, not by subclassing. The coupling axis is what
-separates an ensemble of independent searches from a genetic algorithm: the
-members are either stepped one at a time and never interact, or replaced
-jointly by a generation drawn from the whole set.
+Add a solver by adding a file under `configs/solvers/`, not by subclassing. The
+state carries the population size `k`, because that is what determines whether a
+solver is an ensemble: `FirstAggregator` reads member 0, `MeanAggregator`
+averages all `k`.
 
 ```python
-from puzzle_solvers.solvers import build_solver, describe_all
+from hydra import compose, initialize_config_dir
+from puzzle_solvers.generate_traces.factory import build_solvers
 
-solver = build_solver("genetic_tournament")  # no per-solver subclass
-steps, n, reason = solver.solve(clues, grid, max_time=3.0, seed=0)
-describe_all()["genetic_tournament"]  # the anatomy, for trace metadata
+with initialize_config_dir(config_dir="src/puzzle_solvers/configs", version_base=None):
+    cfg = compose(config_name="generate_traces", overrides=["solvers=[genetic_tournament]"])
+
+solver = build_solvers(cfg)["genetic_tournament"]
+steps, n, reason = solver.with_seed(0).solve(clues, grid, max_time=3.0)
+solver.describe()  # the anatomy, for trace metadata
 ```
 
-### Registered solvers
-| name | proposal | schedule | aggregation | coupling |
-| --- | --- | --- | --- | --- |
-| `mac` | belief propagation | global | identity | none |
-| `mac_random_line` | belief propagation | local | identity | none |
-| `mac_population` | belief propagation | local | mean(100) | none |
-| `genetic_tournament` | evolutionary | global | mean(1000) | evolutionary (tournament) |
-| `genetic_proportionate` | evolutionary | global | mean(1000) | evolutionary (proportionate) |
-| `gd_adam` / `gd_sgd` / `gd_bangbang` | gradient descent | global | identity | none |
-| `gd_adam_random_init` | gradient descent | global | identity | none |
-| `gd_adam_random_init_population` | gradient descent | global | mean(10) | none |
-| `backtracking_search` | backtracking | local | identity | none |
-| `backtracking_population` | backtracking | local | mean(100) | none |
-| `model_solver` | recursive model | global | identity | none |
+Every part in the table above is named by a `_target_`, so a solver file is:
 
-The gradient-descent rows split on `init`: the first three start from a zero
-grid of logits, the last two from a random one (see below). Every registered
-gradient-descent row uses `Global`; `Parallel` and `Sequential` are reachable via
-`anatomy_of` as the unregistered ablations `gd_jacobi_adam`, `gd_jacobi_sgd`,
-`gd_gauss_seidel_adam`, `gd_gauss_seidel_sgd`, and are not run by
-`generate_traces` unless asked for by name. `Sequential` in particular costs one
-gradient per cell, so a step goes from one loss evaluation to one per cell.
+```yaml
+ac_population:
+  name: ac_population
+  strategy:
+    _target_: puzzle_solvers.solvers.arc_consistency.ACPerLineStrategy
+  state:
+    _target_: puzzle_solvers.solvers.arc_consistency.ACState
+    k: 100
+    seed: 42
+  aggregator:
+    _target_: puzzle_solvers.aggregation.MeanAggregator
+```
+
+Note the solver name as the top-level key: it is what lets several solver files
+compose without their `strategy` / `state` / `aggregator` nodes overwriting one
+another, and what makes `solvers=[a,b]` on the command line work.
+
+### Configured solvers
+| name | state | strategy | aggregator |
+| --- | --- | --- | --- |
+| `ac_parallel` | arc consistency (k=1) | parallel | first |
+| `ac_population` | arc consistency (k=100) | per-line | mean(100) |
+| `backtracking_search` | backtracking (k=1) | per-cell | first |
+| `backtracking_population` | backtracking (k=100) | per-cell | mean(100) |
+| `genetic_tournament` | GA (k=100) | tournament | mean(100) |
+| `genetic_rank` | GA (k=100) | rank | mean(100) |
+| `genetic_roulette` | GA (k=100) | roulette | mean(100) |
+| `gd_adam` | Adam (k=1) | gradient descent | first |
+| `gd_sgd` | SGD (k=1) | gradient descent | first |
+| `gd_adam_population` | Adam (k=10) | gradient descent | mean(10) |
+| `nn_recursive_mlp` | checkpointed MLP (k=1) | neural network | first |
+
+The default `solvers` selection covers all of these, so a bare
+`python -m puzzle_solvers.generate_traces` runs the whole catalogue -- which
+means it needs the checkpoint (below) and takes minutes rather than seconds.
+Narrow it with `solvers=[ac_parallel,backtracking_search]` for a quick run.
+
+An ensemble needs a stochastic partner: averaging `k` copies of a deterministic
+trajectory reproduces that trajectory. `ACParallelStrategy` and the
+gradient-descent state both start from a fixed grid and never draw from
+`state.rng`, so neither can be meaningfully averaged -- `ac_parallel` is
+therefore paired with `ACPerLineStrategy` (which shuffles its line order), and
+`gd_adam_population` is kept only to make that cost visible.
 
 ### Assumptions
 - Puzzles are square grids described by padded clues of shape `(2, H, K)` with
@@ -72,12 +98,36 @@ gradient per cell, so a step goes from one loss evaluation to one per cell.
 - Every step acts on every component its proposal can move. There is no
   sampling ratio: `Parallel` is `Global` under another name and `Sequential`
   chains one move per component.
-- Every random draw comes from `Problem.rng`, seeded per solve. The solvers do
-  not touch the global numpy or torch RNGs, so traces are reproducible and
-  parallel workers cannot interfere with each other. `Mean(k)` gives each member
-  its own generator, seeded from `(seed, member_index)`, so members are
-  independent of each other and of the order they are stepped in.
+- Every random draw comes from `state.rng`, rebuilt from `(seed, step)` on every
+  transition. The solvers do not touch the global numpy or torch RNGs, so traces
+  are reproducible and parallel workers cannot interfere with each other. `k`
+  members share one `state.rng` and are stepped in index order, so a member's
+  draws depend on how many earlier members drew -- which is why the population
+  configs below are paired with a strategy whose shuffle is what varies.
 - No core pinning or CPU-time accounting.
+
+### Running `generate_traces`
+Hydra config, overridable from the command line:
+
+```
+python -m puzzle_solvers.generate_traces max_size=100 'solvers=[ac_parallel,gd_adam]'
+python -m puzzle_solvers.generate_traces --cfg job     # show the composed config
+python -m puzzle_solvers.generate_traces --help        # list the solver group
+```
+
+The output lands in `$DATA_DIR/traces_dataset/nonograms/<output>`, resolved
+against the directory the command was run from rather than hydra's run
+directory, so `data/traces_dataset/nonograms/` stays where the existing
+consumers and DVC tracking expect it. Each selected solver becomes one column in
+`traces`.
+
+### Historical notes
+Everything below this line was written against the previous `Anatomy` registry
+(`mac`, `gd_bangbang`, `model_solver`, `anatomy_of`, `Problem.rng`, and the
+four axes). The measurements still describe why the configurations above are
+shaped the way they are, but the names no longer exist; the equivalents are in
+the table above (`mac` ~ `ac_parallel`, `Mean(k)` ~ `MeanAggregator`, and so
+on).
 
 ### Ensembles need a stochastic pair
 `Mean(k)` is only meaningful when the (proposal, schedule) pair actually draws
@@ -201,10 +251,47 @@ per member), so compare solve rate rather than step counts.
   `backtracking_search` (5/5 solved in 19-43 steps against 4/5 in 89-143,
   seed 1-5): the members disagree about which cell to commit, so the mean
   survives a wrong early commitment that a single trajectory cannot.
-- `model_solver` loads its checkpoint lazily, on first use, and infers the
-  architecture from the checkpoint (clue width, output channels, hidden size).
-  Registry rows declare what they need in `Anatomy.requires`, so callers pass
-  `build_solver(..., clues_shape=..., model_path=...)` without special-casing it.
+- `nn_recursive_mlp` loads its checkpoint lazily, on first use, and infers the
+  architecture from the checkpoint rather than from the config: `hidden_size`
+  and the output width come out of the state dict, so a checkpoint cannot be
+  paired with a mismatched model. See below for the rest.
+
+### Checkpoints
+`state.model_path` is required in the solver config and is resolved against
+`CHECKPOINT_DIR` -- `$MODEL_DIR` if set, else `<repo>/checkpoints`, made absolute
+so it does not depend on the directory the process was launched from. That
+directory has to match what `train.py` writes, which is
+`<dataset>/<model_class>/<nn>.pt` with both names the class lowercased and
+stripped of underscores (`NonogramsDataset` -> `nonogramsdataset`,
+`RecursiveMLP` -> `recursivemlp`). So the 5x5 MLP is
+`nonogramsdataset/recursivemlp/default.pt`, *not* `recursive_mlp/default.pt`.
+
+Two things are deliberately not inferred:
+
+- `num_layers`. `RecursiveMLP` applies one shared `ResidualBlock` in a loop, so
+  it owns no parameters. It also is not the same thing as the solver's step
+  count: training applied it 9 times inside one forward pass, whereas here each
+  solver step applies it once, so a trace comparable to a training forward runs
+  for about 9 steps.
+- The grid size. The clue width is baked into `clue_embed.pos_embed`, so a 5x5
+  checkpoint cannot drive a 10x10 puzzle; that is rejected on load with the two
+  sizes named, rather than as an opaque size mismatch from `load_state_dict`.
+
+The model emits `num_classes` logits per cell rather than one score, because
+`AbstainLoss` trains two classes plus an abstain channel. `NNState.grids`
+therefore softmaxes over the class axis and renormalises by the probability the
+model did *not* abstain -- the same renormalisation the loss optimises -- so the
+trace carries a probability per cell like every other solver.
+
+### Readout and stopping
+`State.grids` is the readout, and what a trace records; `State.raw_grids` is the
+state as stored. They differ wherever a readout is lossy, and that difference
+matters for stopping: `sigmoid'` is at most 0.25, so an Adam step that moves
+the logits by about `lr` lands *inside* the `1e-3` stop tolerance once mapped to
+[0, 1]. Testing "did this move" on the readout therefore ended `gd_adam`'s trace
+two steps in instead of ~190. `Solver.solve` decides `SOLVED` on the readout
+(where `solution` lives) and `NO_CHANGE` on the raw state (where the search
+moves), so changing a readout cannot silently change how long a solver runs.
 - `mac_parallel` was removed. It never had an implementation -- the `mac_plus.py`
   it was named after was an empty placeholder that was never committed -- and as a
   registered row it was a byte-for-byte duplicate of `mac` in every dataset.

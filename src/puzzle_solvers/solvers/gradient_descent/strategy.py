@@ -19,7 +19,7 @@ class GDStrategy(Strategy):
     def __call__(self, state: GDBaseState) -> GDBaseState:
         """Perform a single gradient descent step on the state and return the new state."""
         param = state.optimiser.param_groups[0]["params"][0]
-        param.data = state.grid.detach().clone().to(DEVICE)
+        param.data = state.pop_of_grids.detach().clone().to(DEVICE)
         
         with torch.enable_grad():
             loss = self.loss_fn(param.reshape(state.k, -1), state.torch_clues)
@@ -31,7 +31,7 @@ class GDStrategy(Strategy):
         
         return replace(
             state,
-            grid=param.detach().clone(),
-            grad=grad,
+            pop_of_grids=param.detach().clone(),
+            pop_grads=grad,
             step=state.step + 1,
         )

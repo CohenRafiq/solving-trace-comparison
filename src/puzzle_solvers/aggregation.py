@@ -1,11 +1,13 @@
 from dataclasses import dataclass, field
 
-from puzzle_solvers.types import Aggregator
 import numpy as np
 import torch
 
+from puzzle_solvers.types import Aggregator
+
 from .losses.clue_reconstruction_loss import ClueReconstructionLoss
 from .solvers.utils.const import UNKNOWN
+
 
 @dataclass(frozen=True)
 class FirstAggregator(Aggregator):
@@ -19,7 +21,7 @@ class FirstAggregator(Aggregator):
 @dataclass(frozen=True)
 class MeanAggregator(Aggregator):
     """Return the mean of the predictions, ignoring -1 values."""
-    
+
     def __call__(self, predictions: np.ndarray, clues: np.ndarray) -> np.ndarray:
         if self.unknown_handling == "replace":
             predictions = np.where(predictions == UNKNOWN, 0.5, predictions)
@@ -32,13 +34,13 @@ class MeanAggregator(Aggregator):
 
 @dataclass(frozen=True)
 class WeightedMeanAggregator(Aggregator):
-    """Return the weighted mean of the predictions, 
-    with weights based on clue reconstruction loss.""" 
+    """Return the weighted mean of the predictions,
+    with weights based on clue reconstruction loss."""
 
     loss: ClueReconstructionLoss = field(default_factory=ClueReconstructionLoss)
 
     def _compute_sample_weights(
-            self, losses: np.ndarray, 
+            self, losses: np.ndarray,
             temperature: float = 1.0) -> np.ndarray:
         normalised = (losses - losses.mean()) / (losses.std() + 1e-12)
         inverted = -normalised
@@ -48,9 +50,10 @@ class WeightedMeanAggregator(Aggregator):
 
     def __call__(self, predictions: np.ndarray, clues: np.ndarray) -> np.ndarray:
         filled = np.where(predictions == UNKNOWN, 0.5, predictions)
-        losses = self.loss(
-            torch.tensor(filled, dtype=torch.float32), 
-            torch.tensor(clues, dtype=torch.float32)).numpy()
+        k = len(filled)
+        grid = torch.tensor(filled, dtype=torch.float32).reshape(k, -1)
+        target = torch.as_tensor(np.asarray(clues, dtype=np.float32)).reshape(1, -1).expand(k, -1)
+        losses = self.loss(grid, target).reshape(k).numpy()
         weights = self._compute_sample_weights(losses, temperature=1.0)
         if self.unknown_handling == "replace":
             return np.average(filled, axis=0, weights=weights)

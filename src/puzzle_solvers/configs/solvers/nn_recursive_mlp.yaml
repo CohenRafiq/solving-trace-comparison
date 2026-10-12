@@ -1,0 +1,23 @@
+nn_recursive_mlp:
+  name: nn_recursive_mlp
+  # `model_path` is relative to CHECKPOINT_DIR ($MODEL_DIR, else <repo>/checkpoints)
+  # and must match what `train.py` saves: <dataset>/<model_class>/<nn>.pt, both
+  # names the class lowercased with no underscore. 5x5 only -- its clue width is
+  # baked into the checkpoint, and a different grid size is rejected on load.
+  strategy:
+    _target_: puzzle_solvers.solvers.neural_network.NNStrategy
+  state:
+    _target_: puzzle_solvers.solvers.neural_network.NNState
+    k: 1
+    seed: 42
+    model_class: neural_models.models.recursive_mlp.RecursiveMLP
+    model_path: nonogramsdataset/recursivemlp/default.pt
+    # `hidden_size` is read from the checkpoint. `num_layers` is not: the model
+    # applies one shared core block in a loop, so it owns no parameters. Training
+    # applied it 9 times inside a single forward pass, whereas here each solver
+    # step applies it once, so a comparable trace runs for about 9 steps.
+    num_layers: 9
+    dropout: 0.3
+  aggregator:
+    _target_: puzzle_solvers.aggregation.FirstAggregator
+    unknown_handling: replace

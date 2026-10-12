@@ -5,7 +5,7 @@ cells that are UNKNOWN (-1), EMPTY (0) or FILLED (1).
 
 Two engines, chosen by what the caller needs:
 
-* Reachability engine (`line_feasible`, `line_forced`): the clue is compiled to a
+* Reachability engine (`line_feasible`): the clue is compiled to a
   tiny automaton whose state set is one Python int, so each cell costs a few
   bit operations. Needs no counts, so it is the fast path for propagation.
 * Counting engine (`line_counts`, `line_marginal`): counts placements block by
@@ -23,9 +23,10 @@ from __future__ import annotations
 
 from functools import cache, lru_cache
 from itertools import accumulate
-from .const import EMPTY, FILLED, UNKNOWN
 
 import numpy as np
+
+from .const import EMPTY, FILLED, UNKNOWN
 
 
 def _spare_cells(blocks: tuple[int, ...], line_length: int) -> int:
@@ -147,20 +148,21 @@ def _reachable(blocks: tuple[int, ...], known: tuple[int, ...]) -> list[int] | N
     return states if active >> final_state & 1 else None
 
 
-def _line_feasible(blocks: tuple[int, ...], known: tuple[int, ...]) -> bool:
+# --- Public API --------------------------------------------------------------
+
+
+def line_feasible(blocks: tuple[int, ...], known: tuple[int, ...]) -> bool:
     """Whether the partial line can still be completed to match `blocks`."""
     if _spare_cells(blocks, len(known)) < 0:
         return False
     return _reachable(blocks, known) is not None
 
-# --- Public API --------------------------------------------------------------
-
 def consistent_at_cell(grid: np.ndarray, row: int, col: int, blocks) -> bool:
     """Whether the partial grid is consistent with the clues at a given cell."""
     row_blocks, col_blocks = blocks
     return (
-        _line_feasible(tuple(grid[row, :].tolist()), row_blocks[row])
-        and _line_feasible(tuple(grid[:, col].tolist()), col_blocks[col])
+        line_feasible(row_blocks[row], tuple(grid[row, :].tolist()))
+        and line_feasible(col_blocks[col], tuple(grid[:, col].tolist()))
     )
 
 @lru_cache(maxsize=100_000)

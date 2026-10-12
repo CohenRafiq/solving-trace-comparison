@@ -1,0 +1,12 @@
+genetic_roulette:
+  name: genetic_roulette
+  strategy:
+    _target_: puzzle_solvers.solvers.genetic_algorithm.GARouletteStrategy
+    mutation_rate: 0.01
+  state:
+    _target_: puzzle_solvers.solvers.genetic_algorithm.GAState
+    k: 100
+    seed: 42
+  aggregator:
+    _target_: puzzle_solvers.aggregation.MeanAggregator
+    unknown_handling: replace

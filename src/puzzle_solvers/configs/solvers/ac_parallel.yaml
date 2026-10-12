@@ -1,0 +1,13 @@
+ac_parallel:
+  name: ac_parallel
+  # One global sweep per step: every line is deduced from the grid as it was.
+  # Deterministic, so a population here would be k copies of one trajectory.
+  strategy:
+    _target_: puzzle_solvers.solvers.arc_consistency.ACParallelStrategy
+  state:
+    _target_: puzzle_solvers.solvers.arc_consistency.ACState
+    k: 1
+    seed: 42
+  aggregator:
+    _target_: puzzle_solvers.aggregation.FirstAggregator
+    unknown_handling: replace

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+
 import numpy as np
 import torch
 
@@ -37,11 +38,23 @@ class GDBaseState(State, ABC):
             "optimiser": self.create_optimiser(torch.nn.Parameter(full_zeros.clone())),
         }
 
+    @property
+    def grids(self) -> np.ndarray:
+        logits = self.pop_of_grids
+        if logits.ndim != 3:
+            raise RuntimeError(
+                f"expected (k, H, W) logits, got shape {tuple(logits.shape)}; "
+                "the state was never initialised"
+            )
+        return (
+            torch.sigmoid(logits.detach().float()).cpu().numpy().astype(np.float64)
+        )
+
 
 @dataclass(frozen=True)
 class GDSGDState(GDBaseState):
     """Stochastic Gradient Descent (SGD) optimiser state."""
-    
+
     lr: float = 0.01
     momentum: float = 0.0
     dampening: float = 0.0
@@ -68,7 +81,7 @@ class GDAdamState(GDBaseState):
     eps: float = 1e-8
     weight_decay: float = 0.0
     amsgrad: bool = False
-    
+
     def create_optimiser(self, param: torch.nn.Parameter) -> torch.optim.Optimizer:
         return torch.optim.Adam(
             [param],

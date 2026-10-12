@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+
 import numpy as np
 
+from utils.grid import clues_to_tuples
 from ...types import State
 from ..utils.const import UNKNOWN, empty_int8
 from ..utils.line_checking import line_marginal
 
-from __future__ import annotations
 
 @dataclass(frozen=True)
 class ACState(State):
@@ -26,9 +27,10 @@ class ACState(State):
     def _init_params(self, padded_clues: np.ndarray, grid_shape: tuple[int, int]) -> dict:
         return {
             "pop_of_grids": np.full((self.k, *grid_shape), UNKNOWN, dtype=np.int8),
-            "clue_blocks": self._clues_to_tuples(padded_clues),
+            "clue_blocks": clues_to_tuples(padded_clues),
         }
 
+@dataclass(frozen=True)
 class ACFuseState(ACState):
     """Predict probability of unknown cells."""
 

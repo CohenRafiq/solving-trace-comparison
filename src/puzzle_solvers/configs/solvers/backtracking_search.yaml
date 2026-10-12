@@ -1,0 +1,13 @@
+backtracking_search:
+  name: backtracking_search
+  # One committed cell per step. `_pick` draws a random unknown cell and a random
+  # value, so k > 1 gives genuinely independent searches to average over.
+  strategy:
+    _target_: puzzle_solvers.solvers.backtracking_search.BSStrategy
+  state:
+    _target_: puzzle_solvers.solvers.backtracking_search.BSState
+    k: 1
+    seed: 42
+  aggregator:
+    _target_: puzzle_solvers.aggregation.FirstAggregator
+    unknown_handling: replace

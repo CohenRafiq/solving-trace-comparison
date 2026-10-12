@@ -128,6 +128,12 @@ def unpad_clue(clue) -> tuple[int, ...]:
             flat.append(int(item))
     return tuple(b for b in flat if b > 0)
 
+def clues_to_tuples(clues: np.ndarray) -> tuple[tuple[tuple[int, ...], ...], ...]:
+    """(2, N, K) padded clues -> per-axis tuples of unpadded int clues."""
+    ints = np.asarray(clues).astype(int).tolist()
+    return tuple(
+        tuple(tuple(v for v in line if v > 0) for line in half) for half in ints
+    )
 
 def pad_clues(clues: list[list[list[int]]], pad_value=0):
     grid_side_length = max(len(clues[0]), len(clues[1]))

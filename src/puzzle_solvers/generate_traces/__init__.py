@@ -1,9 +1,5 @@
-from puzzle_solvers.generate_traces.cli import main
-from puzzle_solvers.generate_traces.config import TracesConfig
+from puzzle_solvers.generate_traces.factory import build_solvers
 from puzzle_solvers.generate_traces.runner import run
+from puzzle_solvers.solver import Solver, build_solver
 
-__all__ = [
-    "TracesConfig",
-    "main",
-    "run",
-]
+__all__ = ["Solver", "build_solver", "build_solvers", "main", "run"]

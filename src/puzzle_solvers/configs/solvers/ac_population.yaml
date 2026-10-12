@@ -1,11 +1,14 @@
-# conf/solvers/ac_population.yaml
-strategy:
-  name: arc_consistency
-state:
-  name: arc_consistency
-  seed: 42
-renderer:
-  name: ac_blend
-aggregation:
-  name: population
-  k: 100
+ac_population:
+  name: ac_population
+  # 100 independent arc-consistency sweeps, recorded as their per-cell mean.
+  # ACPerLineStrategy applies one line per step in a random order, so the
+  # members differ; ACParallelStrategy would make the 100 members identical.
+  strategy:
+    _target_: puzzle_solvers.solvers.arc_consistency.ACPerLineStrategy
+  state:
+    _target_: puzzle_solvers.solvers.arc_consistency.ACState
+    k: 100
+    seed: 42
+  aggregator:
+    _target_: puzzle_solvers.aggregation.MeanAggregator
+    unknown_handling: replace
