@@ -6,7 +6,7 @@ from dataclasses import dataclass, field, replace
 import numpy as np
 
 from ...types import Strategy
-from ..gradient_descent.fitness import population_fitness
+from .fitness import population_fitness
 from .state import GAState
 
 

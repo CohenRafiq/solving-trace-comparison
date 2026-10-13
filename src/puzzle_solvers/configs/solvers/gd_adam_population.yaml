@@ -1,17 +1,14 @@
 gd_adam_population:
   name: gd_adam_population
-  # Gradient descent has no random init in the current State, so every member is
-  # an identical copy: k > 1 is k times the cost for one trajectory. Kept as an
-  # ablation to make that cost visible rather than assumed.
   strategy:
     _target_: puzzle_solvers.solvers.gradient_descent.GDStrategy
     loss_fn:
-      _target_: puzzle_solvers.losses.clue_reconstruction_loss.ClueReconstructionLoss
+      _target_: puzzle_solvers.losses.line_automata_loss.LineAutomatonLoss
   state:
     _target_: puzzle_solvers.solvers.gradient_descent.GDAdamState
     k: 10
     seed: 42
-    lr: 1e-3
+    lr: 1.5
   aggregator:
     _target_: puzzle_solvers.aggregation.MeanAggregator
     unknown_handling: replace

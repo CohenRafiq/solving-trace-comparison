@@ -1,0 +1,14 @@
+backtracking_population_weighted:
+  name: backtracking_population_weighted
+  strategy:
+    _target_: puzzle_solvers.solvers.backtracking_search.BSStrategy
+  state:
+    _target_: puzzle_solvers.solvers.backtracking_search.BSState
+    k: 100
+    seed: 42
+  aggregator:
+    _target_: puzzle_solvers.aggregation.BacktrackingWeightedAggregator
+    unknown_handling: replace
+    loss:
+      _target_: puzzle_solvers.losses.line_automata_loss.LineAutomatonLoss
+      reduction: none

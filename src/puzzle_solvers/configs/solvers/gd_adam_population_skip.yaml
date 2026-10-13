@@ -1,0 +1,14 @@
+gd_adam_population_skip:
+  name: gd_adam_population_skip
+  strategy:
+    _target_: puzzle_solvers.solvers.gradient_descent.GDStrategy
+    loss_fn:
+      _target_: puzzle_solvers.losses.line_automata_loss.LineAutomatonLoss
+  state:
+    _target_: puzzle_solvers.solvers.gradient_descent.GDAdamState
+    k: 10
+    seed: 42
+    lr: 1.5
+  aggregator:
+    _target_: puzzle_solvers.aggregation.MeanAggregator
+    unknown_handling: skip

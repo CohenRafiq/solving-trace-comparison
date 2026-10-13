@@ -23,18 +23,23 @@ def _valid(clues: torch.Tensor) -> torch.Tensor:
 
 @dataclass(eq=False)
 class ClueReconstructionLoss(nn.Module):
-    """Reconstructs nonogram clues from a soft grid; `anneal_progress` in [0, 1] sharpens it."""
+    """Reconstructs nonogram clues from a soft grid using standard sigmoid."""
 
     aux_weight: float = 0.3
-    binarize_weight: float = 0.1
-    temperature_start: float = 2.0
-    temperature_end: float = 0.5
+    binarize_weight: float = 1.0
+    batch_reduction: str = "sum"  # "sum" (batch-invariant) or "mean"
 
     def __post_init__(self):
         super().__init__()
+        if self.batch_reduction not in ("sum", "mean"):
+            raise ValueError("batch_reduction must be 'sum' or 'mean'")
+
+    def _batch(self, per_puzzle: torch.Tensor) -> torch.Tensor:
+        return per_puzzle.sum() if self.batch_reduction == "sum" else per_puzzle.mean()
 
     def _compute(self, probs, row_clues, col_clues, binarize_weight):
-        N, K = probs.shape[1], row_clues.shape[-1]
+        B, N = probs.shape[0], probs.shape[1]
+        K = row_clues.shape[-1]
         probs_t = probs.transpose(1, 2)
         pred_row, cum_row = _runs(probs, K)
         pred_col, cum_col = _runs(probs_t, K)
@@ -42,17 +47,24 @@ class ClueReconstructionLoss(nn.Module):
         row_valid, col_valid = _valid(row_clues), _valid(col_clues)
         row_err = (pred_row - row_clues) ** 2 * row_valid
         col_err = (pred_col - col_clues) ** 2 * col_valid
-        main = (row_err.sum() + col_err.sum()) / (row_valid.sum() + col_valid.sum() + 1e-8)
 
-        aux = sum(
-            (((fill - clues.sum(-1)) / N) ** 2).mean()
-            + (((cum[..., -1] - (clues > 0).sum(-1)) / K) ** 2).mean()
-            for fill, clues, cum in (
-                (probs.sum(-1), row_clues, cum_row),
-                (probs_t.sum(-1), col_clues, cum_col),
+        # Per-puzzle normalisation (B,)
+        n_valid = row_valid.sum((1, 2)) + col_valid.sum((1, 2)) + 1e-8
+        main_pp = (row_err.sum((1, 2)) + col_err.sum((1, 2))) / n_valid
+
+        aux_pp = 0.0
+        for fill, clues, cum in (
+            (probs.sum(-1), row_clues, cum_row),
+            (probs_t.sum(-1), col_clues, cum_col),
+        ):
+            aux_pp = aux_pp + (
+                (((fill - clues.sum(-1)) / N) ** 2).mean(-1)
+                + (((cum[..., -1] - (clues > 0).sum(-1)) / K) ** 2).mean(-1)
             )
-        )
-        binarize = (probs * (1.0 - probs)).mean()
+
+        binarize_pp = (probs * (1.0 - probs)).mean((1, 2))
+
+        main, aux, binarize = self._batch(main_pp), self._batch(aux_pp), self._batch(binarize_pp)
 
         return {
             "loss": main + self.aux_weight * aux + binarize_weight * binarize,
@@ -68,11 +80,8 @@ class ClueReconstructionLoss(nn.Module):
             "mean_saturation": (probs - 0.5).abs().mean(),
         }
 
-    def forward(self, grid, clues, anneal_progress=0.0, return_metrics=False):
+    def forward(self, grid, clues, return_metrics=False):
         """grid: (B, N*N) logits; clues: (B, 2*N*K) flattened rows then cols."""
-        t = min(max(float(anneal_progress), 0.0), 1.0)
-        temperature = self.temperature_start + t * (self.temperature_end - self.temperature_start)
-
         B, S = grid.shape
         N = math.isqrt(S)
         if N * N != S:
@@ -80,9 +89,10 @@ class ClueReconstructionLoss(nn.Module):
         if clues.shape[-1] % (2 * N):
             raise ValueError(f"clues last dim {clues.shape[-1]} not divisible by 2*N={2 * N}")
 
-        probs = torch.sigmoid(grid / temperature).view(B, N, N)
+        probs = torch.sigmoid(grid).view(B, N, N)
+
         row_clues, col_clues = clues.to(grid.device).view(B, 2, N, -1).unbind(1)
-        out = self._compute(probs, row_clues, col_clues, self.binarize_weight * t)
+        out = self._compute(probs, row_clues, col_clues, self.binarize_weight)
 
         if not return_metrics:
             return out["loss"]

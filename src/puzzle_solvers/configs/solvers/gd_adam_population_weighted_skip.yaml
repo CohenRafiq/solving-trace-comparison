@@ -1,0 +1,18 @@
+gd_adam_population_weighted_skip:
+  name: gd_adam_population_weighted_skip
+  strategy:
+    _target_: puzzle_solvers.solvers.gradient_descent.GDStrategy
+    loss_fn:
+      _target_: puzzle_solvers.losses.line_automata_loss.LineAutomatonLoss
+  state:
+    _target_: puzzle_solvers.solvers.gradient_descent.GDAdamState
+    k: 10
+    seed: 42
+    lr: 1.5
+  aggregator:
+    _target_: puzzle_solvers.aggregation.WeightedMeanAggregator
+    unknown_handling: skip
+    loss:
+      _target_: puzzle_solvers.losses.clue_reconstruction_loss.ClueReconstructionLoss
+      aux_weight: 0.3
+      binarize_weight: 1.0

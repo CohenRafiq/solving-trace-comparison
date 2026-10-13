@@ -5,12 +5,12 @@ gd_adam:
   strategy:
     _target_: puzzle_solvers.solvers.gradient_descent.GDStrategy
     loss_fn:
-      _target_: puzzle_solvers.losses.clue_reconstruction_loss.ClueReconstructionLoss
+      _target_: puzzle_solvers.losses.line_automata_loss.LineAutomatonLoss
   state:
     _target_: puzzle_solvers.solvers.gradient_descent.GDAdamState
     k: 1
     seed: 42
-    lr: 1e-3
+    lr: 1.5
   aggregator:
     _target_: puzzle_solvers.aggregation.FirstAggregator
     unknown_handling: replace
