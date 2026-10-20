@@ -1,9 +1,13 @@
-rmse:
-  blocks:
-    - _target_: trace_comparison.blocks.resample.Resample
-      k: 20
-    - _target_: trace_comparison.blocks.rmse.RMSESimilarity
+# Dense-resample the jagged traces, then 1 - RMSE between every solver pair.
+blocks:
+  - _target_: trace_comparison.blocks.resample.Resample
+    k: 20
+  - _target_: trace_comparison.blocks.rmse.RMSESimilarity
 
+input: large.jsonl
+solvers: null # null -> every solver in the file, in order of first appearance
+max_size: null
+puzzle_filter: all_solved # all_solved | null
 data_dir: ${oc.env:DATA_DIR,./data}
-output: test_similarity.csv
+output_file: test_similarity.csv
 seed: 42

@@ -1,0 +1,81 @@
+from __future__ import annotations
+
+import json
+from collections.abc import Callable
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+import numpy as np
+
+Runs = dict[str, dict[str, Any]]  # {solver: run record}
+
+#: Creation-time puzzle filter: keep a puzzle only if every solver solved it,
+#: keep everything, or an arbitrary predicate over ``{solver: run}``.
+_FILTERS: dict[str | None, Callable[[Runs], bool]] = {
+    None: lambda runs: True,
+    "all_solved": lambda runs: all(r.get("solved", False) for r in runs.values()),
+}
+
+
+@dataclass(frozen=True, eq=False)
+class TraceDataset:
+    """`(solvers, puzzles)` object array of per-trace `(steps, width, height)` grids."""
+
+    traces: np.ndarray  # (S, N) dtype=object; cell = float (T, W, H)
+    solvers: tuple[str, ...]  # row order of `traces`
+    grid_shape: tuple[int, int]  # (width, height), from meta.shape
+
+    @property
+    def shape(self) -> tuple:
+        """Logical shape; the ragged step axis is `None`."""
+        return (*self.traces.shape, None, *self.grid_shape)
+
+
+def load_trace_dataset(
+    path: str | Path,
+    solvers: list[str] | None = None,
+    max_size: int | None = None,
+    puzzle_filter: str | None | Callable[[Runs], bool] = "all_solved",
+    run: int = 0,
+) -> TraceDataset:
+    keep = puzzle_filter if callable(puzzle_filter) else _FILTERS.get(puzzle_filter)
+    if keep is None:
+        raise ValueError(
+            f"Unknown puzzle_filter {puzzle_filter!r}; expected one of {list(_FILTERS)} or a callable"
+        )
+    
+    grid_shape = None
+    rows: list[list[np.ndarray]] = []  # rows[puzzle][solver]
+
+    with Path(path).open(encoding="utf-8") as f:
+        for i, line in enumerate(f):
+            if not line.strip():
+                continue
+            record = json.loads(line)
+            where = f"{path} line {i + 1}"
+            if grid_shape is None:
+                grid_shape = tuple(record["meta"]["shape"])
+                solvers = tuple(record["traces"]) if solvers is None else solvers
+            try:
+                runs = {s: record["traces"][s][run] for s in solvers}
+            except (KeyError, IndexError) as e:
+                available = list(record["traces"])
+                raise ValueError(
+                    f"{where}: no run {run} for solvers {list(solvers)} ({e!r}); available {available}"
+                ) from e
+            if not keep(runs):
+                continue
+            rows.append([np.asarray(runs[s]["steps"], dtype=np.float32) for s in solvers])
+            if max_size is not None and len(rows) >= max_size:
+                break
+
+    if grid_shape is None:
+        raise ValueError(f"{path} contains no records")
+    if not rows:
+        raise ValueError(f"{path}: no puzzles kept (puzzle_filter={puzzle_filter!r})")
+
+    traces = np.empty((len(solvers), len(rows)), dtype=object)
+    for s, p in np.ndindex(traces.shape):  # cell-wise: numpy would try to stack ragged arrays
+        traces[s, p] = rows[p][s]
+    return TraceDataset(traces, solvers, grid_shape)

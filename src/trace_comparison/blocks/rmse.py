@@ -1,13 +1,18 @@
 import numpy as np
-from trace_comparison.blocks.base import Block
+
+from trace_comparison.blocks.base import Block, DataKind
+
 
 class RMSESimilarity(Block):
-    """"
+    """
     input_shape: (solvers, ...)
     output_shape: (solvers, solvers, ...)
 
     Computes the 1 - RMSE between each pair of solvers.
     """
+
+    input_kind = DataKind.DENSE
+    output_kind = DataKind.MATRIX
 
     def output_shape(self, input_shape: tuple[int, ...]) -> tuple[int, ...]:
         if len(input_shape) < 1:

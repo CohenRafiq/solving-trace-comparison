@@ -1,51 +1,53 @@
+from collections.abc import Iterable
 from pathlib import Path
 
 import hydra
+import numpy as np
+import pandas as pd
 from hydra.utils import instantiate
 from omegaconf import DictConfig
-import pandas as pd
 
-from puzzle_solvers.generate_traces.config import resolve
+from .blocks.base import Block, DataKind, check_kind
+from .dataset import TraceDataset, load_trace_dataset
 
-CONFIG_PATH = str((Path(__file__).parent.parent / "configs").resolve())
 
-def run_experiment(dataset_columns, blocks):
-    if len(dataset_columns.shape) != 4:
-        raise ValueError(f"Dataset columns must be 4D (solvers, steps, width, height), got {len(dataset_columns.shape)}D")
-    current_data = dataset_columns
-    for i, block in enumerate(blocks):
+def run_experiment(dataset: TraceDataset, blocks: Iterable[Block]) -> np.ndarray:
+    """Pipe the jagged `(solvers, puzzles)` traces through blocks into an `(S, S)` matrix.
+
+    Each block validates its own input and output (see `Block.__call__`).
+    """
+    data = dataset.traces
+    for i, block in enumerate(blocks, start=1):
         try:
-            current_data = block(current_data)
+            data = block(data)
         except Exception as e:
-            raise ValueError(f"Shape validation failed at block {i + 1} ('{block.name}'): {str(e)}") from e
-    expected_shape = (len(dataset_columns), len(dataset_columns))
-    assert current_data.shape == expected_shape, f"Expected shape {expected_shape}, got {current_data.shape}"
-    return current_data
+            e.add_note(f"raised in pipeline block {i}")
+            raise
+    check_kind(data, DataKind.MATRIX, "pipeline output")
+    return data
 
-@hydra.main(version_base=None, config_path=CONFIG_PATH, config_name="generate_traces")
-def main(cfg: DictConfig) -> dict:
-    """Build a trace dataset from a base dataset, one column per configured solver.
+
+@hydra.main(version_base=None, config_path="config", config_name="rmse")
+def main(cfg: DictConfig) -> None:
+    """Build a solver-vs-solver similarity matrix from a traces jsonl file.
 
     Overrides are plain hydra CLI syntax, e.g.
-        python -m puzzle_solvers.generate_traces max_size=100 'solvers=[ac_parallel,gd_adam]'
+        python -m trace_comparison.gen_sim_matrix input=bs_test.jsonl max_size=100
     """
-    cfg = resolve(cfg)
-
-    dataset = instantiate(cfg.dataset, file_name=cfg.input, max_size=cfg.max_size)
-    # (solvers, n_puzzles, steps_jagged, width, height)
-    # jagged because solvers may take different number of steps
-    blocks = instantiate(cfg.blocks)
-    similarity_matrix = run_experiment(dataset.get_columns(cfg.solvers), blocks)
-    df = pd.DataFrame(
-        similarity_matrix,
-        index=cfg.solvers,
-        columns=cfg.solvers,
-        dtype=float,
+    data_dir = Path(cfg.data_dir)
+    dataset = load_trace_dataset(
+        data_dir / "traces_dataset" / "nonograms" / cfg.input,
+        solvers=cfg.solvers,
+        max_size=cfg.max_size,
+        puzzle_filter=cfg.puzzle_filter,
     )
-    output_path = Path(cfg.data_dir) / "similarity_matrix" / "nonograms" /cfg.output_file
-    df.to_csv(output_path, index=True)
-    print(f"Saved similarity matrix to {output_path}")
-    print(df)
+    matrix = run_experiment(dataset, instantiate(cfg.blocks))
+    df = pd.DataFrame(matrix, index=dataset.solvers, columns=dataset.solvers, dtype=float)
+
+    out = data_dir / "similarity_matrix" / "nonograms" / cfg.output_file
+    out.parent.mkdir(parents=True, exist_ok=True)
+    df.to_csv(out)
+    print(f"Saved similarity matrix to {out} ({dataset.traces.shape[1]} puzzles)\n{df}")
 
 
 if __name__ == "__main__":

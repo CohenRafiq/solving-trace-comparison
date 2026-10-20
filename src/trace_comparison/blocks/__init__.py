@@ -1,7 +1,7 @@
-from .base import Block
-from .cka import CKABlock
-from .dtw import DTWBlock
-from .helper import FlattenBlock, MSEBlock
-from .mds import MDSBlock
+from .base import Block, DataKind
+from .resample import Resample
+from .rmse import RMSESimilarity
+from .cosim import CosineSimilarity
+from .cka import CKASimilarity
 
-__all__ = ["Block", "CKABlock", "FlattenBlock", "MSEBlock", "MDSBlock", "DTWBlock"]
+__all__ = ["Block", "DataKind", "Resample", "RMSESimilarity", "CosineSimilarity", "CKASimilarity"]
