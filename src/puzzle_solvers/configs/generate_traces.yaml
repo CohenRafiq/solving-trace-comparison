@@ -2,7 +2,8 @@ defaults:
   # A config group: every entry nests under its own key in `cfg.solvers`, so
   # two solvers never step on each other's `strategy` / `state` / `aggregator`.
   # Select from the CLI with e.g. 'solvers=[ac_parallel,gd_adam]'.
-  - solvers: [ac_population, ac_parallel, backtracking_population, backtracking_search, gd_adam, gd_sgd, genetic_rank, genetic_roulette, genetic_tournament, nn_recursive_mlp]
+  - solvers: [ac_single, ac_population, ac_parallel, backtracking_population, backtracking_search, gd_adam, gd_sgd, genetic_roulette, genetic_tournament, nn_recursive_mlp]
+  # genetic_rank, 
   - _self_
 
 data_dir: ${oc.env:DATA_DIR,./data}

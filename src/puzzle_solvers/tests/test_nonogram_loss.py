@@ -1,7 +1,7 @@
 import pytest
 import torch
 
-from trace_comparison.criterion.clue_reconstruction import ClueReconstructionLoss
+from trace_comparison_old.criterion.clue_reconstruction import ClueReconstructionLoss
 from utils.grid import derive_clues_from_grid
 
 
