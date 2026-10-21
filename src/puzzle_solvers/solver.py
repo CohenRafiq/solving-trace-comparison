@@ -58,7 +58,7 @@ class Solver:
 
     def with_seed(self, seed: int) -> "Solver":
         """A copy whose state draws from `seed` instead of the configured one."""
-        return replace(self, state=replace(self.state, seed=seed))
+        return replace(self, seed=seed, state=replace(self.state, seed=seed))
 
     def describe(self) -> dict:
         return {

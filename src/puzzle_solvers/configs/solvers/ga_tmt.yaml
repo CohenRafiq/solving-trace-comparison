@@ -1,5 +1,6 @@
-genetic_tournament:
-  name: genetic_tournament
+ga_tmt:
+  name: ga_tmt
+  seeds: [1, 2, 3]
   # GAState requires k >= 2: with a single member there is nothing to breed.
   strategy:
     _target_: puzzle_solvers.solvers.genetic_algorithm.GATournamentStrategy
@@ -8,7 +9,6 @@ genetic_tournament:
   state:
     _target_: puzzle_solvers.solvers.genetic_algorithm.GAState
     k: 100
-    seed: 42
   aggregator:
     _target_: puzzle_solvers.aggregation.MeanAggregator
     unknown_handling: replace

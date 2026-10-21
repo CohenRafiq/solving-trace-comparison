@@ -35,24 +35,25 @@ from hydra import compose, initialize_config_dir
 from puzzle_solvers.generate_traces.factory import build_solvers
 
 with initialize_config_dir(config_dir="src/puzzle_solvers/configs", version_base=None):
-    cfg = compose(config_name="generate_traces", overrides=["solvers=[genetic_tournament]"])
+    cfg = compose(config_name="generate_traces", overrides=["solvers=[ga_tmt]"])
 
-solver = build_solvers(cfg)["genetic_tournament"]
-steps, n, reason = solver.with_seed(0).solve(clues, grid, max_time=3.0)
+solvers = build_solvers(cfg)  # ga_tmt -> {"ga_tmt_1", "ga_tmt_2", "ga_tmt_3"}
+solver = solvers["ga_tmt_1"]
+steps, n, reason = solver.solve(clues, grid, max_time=3.0)
 solver.describe()  # the anatomy, for trace metadata
 ```
 
 Every part in the table above is named by a `_target_`, so a solver file is:
 
 ```yaml
-ac_population:
-  name: ac_population
+ac_pop:
+  name: ac_pop
+  seeds: [1, 2, 3]
   strategy:
     _target_: puzzle_solvers.solvers.arc_consistency.ACPerLineStrategy
   state:
     _target_: puzzle_solvers.solvers.arc_consistency.ACState
     k: 100
-    seed: 42
   aggregator:
     _target_: puzzle_solvers.aggregation.MeanAggregator
 ```
@@ -61,32 +62,41 @@ Note the solver name as the top-level key: it is what lets several solver files
 compose without their `strategy` / `state` / `aggregator` nodes overwriting one
 another, and what makes `solvers=[a,b]` on the command line work.
 
-### Configured solvers
-| name | state | strategy | aggregator |
-| --- | --- | --- | --- |
-| `ac_parallel` | arc consistency (k=1) | parallel | first |
-| `ac_population` | arc consistency (k=100) | per-line | mean(100) |
-| `backtracking_search` | backtracking (k=1) | per-cell | first |
-| `backtracking_population` | backtracking (k=100) | per-cell | mean(100) |
-| `genetic_tournament` | GA (k=100) | tournament | mean(100) |
-| `genetic_rank` | GA (k=100) | rank | mean(100) |
-| `genetic_roulette` | GA (k=100) | roulette | mean(100) |
-| `gd_adam` | Adam (k=1) | gradient descent | first |
-| `gd_sgd` | SGD (k=1) | gradient descent | first |
-| `gd_adam_population` | Adam (k=10) | gradient descent | mean(10) |
-| `nn_recursive_mlp` | checkpointed MLP (k=1) | neural network | first |
+The `seeds` list is expanded by `build_solvers` into one run per seed, named
+`{base}_{seed}` -- `ac_pop` with `seeds: [1, 2, 3]` yields the runs `ac_pop_1`,
+`ac_pop_2`, `ac_pop_3`, each with `state.seed` fixed to its number on every
+puzzle. A run name is therefore reproducible from the name alone. Deterministic
+solvers declare `seeds: [1]`; there is no guard against listing more, it would
+just emit identical traces.
 
-The default `solvers` selection covers all of these, so a bare
-`python -m puzzle_solvers.generate_traces` runs the whole catalogue -- which
-means it needs the checkpoint (below) and takes minutes rather than seconds.
-Narrow it with `solvers=[ac_parallel,backtracking_search]` for a quick run.
+### Configured solvers
+| name | state | strategy | aggregator | seeds |
+| --- | --- | --- | --- | --- |
+| `ac_prl` | arc consistency (k=1) | parallel | first | 1 |
+| `ac_pop` | arc consistency (k=100) | per-line | mean(100) | 1-3 |
+| `ac_sgl` | arc consistency (k=1) | per-line | first | 1-3 |
+| `bs_pop` | backtracking (k=100) | per-cell | mean(100) | 1-3 |
+| `bs_pop_skp` | backtracking (k=100) | per-cell | mean(skip) | 1 |
+| `bs_pop_wgt` | backtracking (k=100) | per-cell | weighted mean | 1 |
+| `bs_sgl` | backtracking (k=1) | per-cell | first | 1-3 |
+| `ga_rnk` | GA (k=100) | rank | mean(100) | 1 |
+| `ga_rlt` | GA (k=100) | roulette | mean(100) | 1-3 |
+| `ga_tmt` | GA (k=100) | tournament | mean(100) | 1-3 |
+| `gd_adm` | Adam (k=1) | gradient descent | first | 1 |
+| `gd_sgd` | SGD (k=1) | gradient descent | first | 1 |
+| `nn_rml` | checkpointed MLP (k=1) | neural network | first | 1 |
+
+The default `solvers` selection covers all of these except the three `bs_pop`
+variants and `ga_rnk`, so a bare `python -m puzzle_solvers.generate_traces` runs
+the whole default catalogue -- which means it needs the checkpoint (below) and
+takes minutes rather than seconds. Narrow it with `solvers=[ac_prl,gd_adm]` for
+a quick run.
 
 An ensemble needs a stochastic partner: averaging `k` copies of a deterministic
 trajectory reproduces that trajectory. `ACParallelStrategy` and the
 gradient-descent state both start from a fixed grid and never draw from
-`state.rng`, so neither can be meaningfully averaged -- `ac_parallel` is
-therefore paired with `ACPerLineStrategy` (which shuffles its line order), and
-`gd_adam_population` is kept only to make that cost visible.
+`state.rng`, so neither can be meaningfully averaged -- `ac_prl` is
+therefore paired with `ACPerLineStrategy` (which shuffles its line order).
 
 ### Assumptions
 - Puzzles are square grids described by padded clues of shape `(2, H, K)` with
@@ -110,7 +120,7 @@ therefore paired with `ACPerLineStrategy` (which shuffles its line order), and
 Hydra config, overridable from the command line:
 
 ```
-python -m puzzle_solvers.generate_traces max_size=100 'solvers=[ac_parallel,gd_adam]'
+python -m puzzle_solvers.generate_traces max_size=100 'solvers=[ac_prl,gd_adm]'
 python -m puzzle_solvers.generate_traces --cfg job     # show the composed config
 python -m puzzle_solvers.generate_traces --help        # list the solver group
 ```
@@ -118,8 +128,8 @@ python -m puzzle_solvers.generate_traces --help        # list the solver group
 The output lands in `$DATA_DIR/traces_dataset/nonograms/<output>`, resolved
 against the directory the command was run from rather than hydra's run
 directory, so `data/traces_dataset/nonograms/` stays where the existing
-consumers and DVC tracking expect it. Each selected solver becomes one column in
-`traces`.
+consumers and DVC tracking expect it. Each configured run (`{base}_{seed}`)
+becomes one column in `traces`, and the run's seed is fixed in the name.
 
 ### Historical notes
 Everything below this line was written against the previous `Anatomy` registry

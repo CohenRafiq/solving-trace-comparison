@@ -1,5 +1,6 @@
-gd_adam:
-  name: gd_adam
+gd_adm:
+  name: gd_adm
+  seeds: [1]
   # The zero-init gradient-descent row. Deterministic under every schedule, so
   # it is a single member; ensembling it requires a random init, not a bigger k.
   strategy:
@@ -9,7 +10,6 @@ gd_adam:
   state:
     _target_: puzzle_solvers.solvers.gradient_descent.GDAdamState
     k: 1
-    seed: 42
     lr: 1.5
   aggregator:
     _target_: puzzle_solvers.aggregation.FirstAggregator

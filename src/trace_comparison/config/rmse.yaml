@@ -4,10 +4,10 @@ blocks:
     k: 20
   - _target_: trace_comparison.blocks.rmse.RMSESimilarity
 
-input: large.jsonl
+input: base_1000.jsonl
 solvers: null # null -> every solver in the file, in order of first appearance
 max_size: null
 puzzle_filter: all_solved # all_solved | null
 data_dir: ${oc.env:DATA_DIR,./data}
-output_file: test_similarity.csv
+output_file: rmse_temp.csv
 seed: 42

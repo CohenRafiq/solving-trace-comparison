@@ -18,11 +18,8 @@ from omegaconf import OmegaConf
 from puzzle_solvers.generate_traces.config import resolve
 from puzzle_solvers.generate_traces.factory import build_solvers
 from puzzle_solvers.solver import build_solver
-from puzzle_solvers.solvers.neural_network.state import (
-    infer_architecture,
-    load_checkpoint,
-    resolve_checkpoint,
-)
+from puzzle_solvers.solvers.neural_network.checkpoint import resolve_checkpoint
+from puzzle_solvers.solvers.neural_network.state import infer_architecture, load_checkpoint
 from puzzle_solvers.solvers.utils.const import CHECKPOINT_DIR
 from puzzle_solvers.types import StoppingReason
 
@@ -30,7 +27,7 @@ CONFIG_DIR = str((Path(__file__).parent.parent / "configs").resolve())
 SOLVER_DIR = Path(CONFIG_DIR) / "solvers"
 SOLVER_NAMES = sorted(p.stem for p in SOLVER_DIR.glob("*.yaml"))
 
-#: `nn_recursive_mlp` reads a real checkpoint, so anything that solves against
+#: `nn_rml` reads a real checkpoint, so anything that solves against
 #: one is skipped when the file is absent rather than failed.
 DEFAULT_CHECKPOINT = "nonogramsdataset/recursivemlp/default.pt"
 HAS_CHECKPOINT = resolve_checkpoint(DEFAULT_CHECKPOINT).is_file()
@@ -40,8 +37,8 @@ needs_checkpoint = pytest.mark.skipif(
 
 #: The checkpoint is 5x5 only, and its clue width is baked in, so only the
 #: solvers that never load it are safe to solve on any grid.
-CHECKPOINT_FREE = [n for n in SOLVER_NAMES if n != "nn_recursive_mlp"]
-SOLVABLE = [n for n in SOLVER_NAMES if n == "nn_recursive_mlp" or n in CHECKPOINT_FREE]
+CHECKPOINT_FREE = [n for n in SOLVER_NAMES if n != "nn_rml"]
+SOLVABLE = [n for n in SOLVER_NAMES if n == "nn_rml" or n in CHECKPOINT_FREE]
 
 #: The exact puzzle used by the solve tests, with its clues derived rather than
 #: hand-written so a wrong clue cannot make an assertion pass for the wrong
@@ -74,7 +71,7 @@ def _compose(overrides=()):
 def test_every_solver_file_is_named_in_the_test():
     """Guards against adding a config that this module silently stops covering."""
     assert SOLVER_NAMES, f"no solver configs found under {SOLVER_DIR}"
-    assert "ac_population" in SOLVER_NAMES
+    assert "ac_pop" in SOLVER_NAMES
 
 
 def test_the_root_config_composes():
@@ -100,10 +97,10 @@ def test_each_solver_nests_under_its_own_key():
     every file, so merging flat files would leave only the last solver's axes
     standing.
     """
-    cfg = _compose(["solvers=[ac_parallel,gd_adam]"])
-    assert set(cfg.solvers.keys()) == {"ac_parallel", "gd_adam"}
-    assert cfg.solvers.ac_parallel.strategy._target_.endswith("ACParallelStrategy")
-    assert cfg.solvers.gd_adam.strategy._target_.endswith("GDStrategy")
+    cfg = _compose(["solvers=[ac_prl,gd_adm]"])
+    assert set(cfg.solvers.keys()) == {"ac_prl", "gd_adm"}
+    assert cfg.solvers.ac_prl.strategy._target_.endswith("ACParallelStrategy")
+    assert cfg.solvers.gd_adm.strategy._target_.endswith("GDStrategy")
 
 
 def test_the_default_solver_selection_is_declared_in_the_config():
@@ -120,31 +117,35 @@ def test_the_default_solver_selection_is_declared_in_the_config():
     assert set(selected) <= set(SOLVER_NAMES), (
         f"the default names configs that do not exist: {set(selected) - set(SOLVER_NAMES)}"
     )
-    # `nn_recursive_mlp` needs a checkpoint, so a default run is not checkpoint-free.
+    # `nn_rml` needs a checkpoint, so a default run is not checkpoint-free.
     if HAS_CHECKPOINT:
-        assert "nn_recursive_mlp" in selected
+        assert "nn_rml" in selected
     else:
-        assert "nn_recursive_mlp" not in selected, (
+        assert "nn_rml" not in selected, (
             "the default selects a solver that needs a checkpoint this machine lacks"
         )
 
 
 def test_the_solver_group_can_be_overridden_from_the_cli():
-    cfg = _compose(["solvers=[ac_parallel,backtracking_search]"])
-    assert set(cfg.solvers.keys()) == {"ac_parallel", "backtracking_search"}
+    cfg = _compose(["solvers=[ac_prl,bs_sgl]"])
+    assert set(cfg.solvers.keys()) == {"ac_prl", "bs_sgl"}
 
 
 def test_a_single_solver_group_selection_overrides_the_default():
-    cfg = _compose(["solvers=[gd_adam]"])
-    assert list(cfg.solvers.keys()) == ["gd_adam"]
+    cfg = _compose(["solvers=[gd_adm]"])
+    assert list(cfg.solvers.keys()) == ["gd_adm"]
 
 
 @pytest.mark.parametrize("name", SOLVER_NAMES)
 def test_every_solver_config_builds(name):
     cfg = _compose([f"solvers=[{name}]"])
-    solver = build_solvers(cfg)[name]
+    seeds = list(cfg.solvers[name].seeds)
+    runs = build_solvers(cfg)
 
-    assert solver.name == name
+    assert set(runs.keys()) == {f"{name}_{seed}" for seed in seeds}
+    solver = runs[f"{name}_{seeds[0]}"]
+
+    assert solver.name == f"{name}_{seeds[0]}"
     assert solver.strategy is not None
     assert solver.state is not None
     assert solver.aggregator is not None
@@ -152,8 +153,8 @@ def test_every_solver_config_builds(name):
     assert solver.state.k >= 1
 
     described = solver.describe()
-    assert described["name"] == name
-    assert json.loads(json.dumps(described))["name"] == name
+    assert described["name"] == f"{name}_{seeds[0]}"
+    assert json.loads(json.dumps(described))["name"] == f"{name}_{seeds[0]}"
     # The retired `renderer` axis must not come back through a config.
     assert "renderer" not in described
 
@@ -176,9 +177,7 @@ def test_a_solver_config_missing_an_axis_is_rejected():
 
 def test_a_config_key_that_disagrees_with_its_name_is_rejected():
     cfg = _compose()
-    mismatched = OmegaConf.merge(
-        cfg, {"solvers": {"ac_population": {"name": "something_else"}}}
-    )
+    mismatched = OmegaConf.merge(cfg, {"solvers": {"ac_pop": {"name": "something_else"}}})
     with pytest.raises(KeyError, match="must agree"):
         build_solvers(mismatched)
 
@@ -202,19 +201,49 @@ def test_resolve_honours_an_explicit_output_path():
     assert cfg.output == "/tmp/somewhere.jsonl"
 
 
-def test_seed_is_threaded_into_the_state():
-    cfg = _compose(["solvers=[ac_population]", "solvers.ac_population.state.seed=7"])
-    solver = build_solvers(cfg)["ac_population"]
-    assert solver.state.seed == 7
-    assert solver.with_seed(11).state.seed == 11
-    assert solver.with_seed(11).state.rng is not None
+def test_seeds_are_expanded_into_named_runs():
+    """Each seed in a solver's `seeds` list becomes a run named `{base}_{seed}`."""
+    cfg = _compose(["solvers=[ac_pop]", "solvers.ac_pop.seeds=[7, 9]"])
+    solvers = build_solvers(cfg)
+
+    assert set(solvers.keys()) == {"ac_pop_7", "ac_pop_9"}
+    assert solvers["ac_pop_7"].seed == 7
+    assert solvers["ac_pop_7"].state.seed == 7
+    assert solvers["ac_pop_7"].state.rng is not None
+    assert solvers["ac_pop_9"].state.seed == 9
+
+
+def test_a_solver_config_without_seeds_is_rejected():
+    cfg = _compose(["solvers=[ac_pop]"])
+    broken = OmegaConf.merge(cfg, {"solvers": {"ac_pop": {"seeds": None}}})
+    with pytest.raises(KeyError, match="seeds"):
+        build_solvers(broken)
+
+
+#: Solvers whose strategy or state draws from `state.rng`; the rest are
+#: deterministic and only need a single seed.
+STOCHASTIC = {"ac_sgl", "ac_pop", "bs_sgl", "bs_pop", "ga_rlt", "ga_tmt"}
+
+
+@pytest.mark.parametrize("name", SOLVER_NAMES)
+def test_stochastic_solvers_carry_multiple_seeds_and_deterministic_one(name):
+    """Multiple seeds only buy anything where the solver actually draws from rng.
+
+    There is no hard guard against a deterministic solver listing several seeds
+    -- it would just emit identical traces -- so this pins the catalogue's
+    convention rather than a factory invariant.
+    """
+    seeds = list(_compose([f"solvers=[{name}]"]).solvers[name].seeds)
+    assert len(seeds) > 1 if name in STOCHASTIC else len(seeds) == 1
+    assert len(set(seeds)) == len(seeds), f"{name}: duplicate seeds {seeds}"
 
 
 def test_with_seed_does_not_mutate_the_original_solver():
-    solver = build_solvers(_compose())["ac_population"]
+    solver = build_solvers(_compose())["ac_pop_1"]
     seeded = solver.with_seed(123)
-    assert solver.state.seed == 42
+    assert solver.state.seed == 1
     assert seeded.state.seed == 123
+    assert seeded.seed == 123
     assert seeded.name == solver.name
 
 
@@ -236,7 +265,7 @@ def test_solving_a_real_puzzle_produces_a_trace(name):
     run stops for one of the declared reasons.
     """
     clues = make_clues()
-    solver = build_solvers(_compose([f"solvers=[{name}]"]))[name].with_seed(0)
+    solver = build_solvers(_compose([f"solvers=[{name}]"]))[f"{name}_1"].with_seed(0)
     steps, num_steps, reason = solver.solve(clues, GRID, max_time=30.0)
 
     assert isinstance(reason, StoppingReason)
@@ -266,10 +295,10 @@ def test_the_readout_does_not_decide_when_a_search_stalls():
     A sigmoid compresses small movements -- `sigmoid'` is at most 0.25 -- so a
     raw step that is clearly still moving lands inside the stop tolerance once
     mapped to [0, 1]. Testing the stop rule on the readout is what cut
-    `gd_adam`'s trace from ~190 steps down to 2: an Adam step moves the logits
+    `gd_adm`'s trace from ~190 steps down to 2: an Adam step moves the logits
     by about `lr` per iteration, which the sigmoid then halves below `1e-3`.
     """
-    solver = build_solvers(_compose(["solvers=[gd_adam]"]))["gd_adam"]
+    solver = build_solvers(_compose(["solvers=[gd_adm]"]))["gd_adm_1"]
     state = solver.state.initialise(make_clues(), GRID.shape)
 
     raw = state.raw_grids
@@ -290,7 +319,7 @@ def test_the_readout_does_not_decide_when_a_search_stalls():
 
 @needs_checkpoint
 def test_the_checkpointed_solver_also_reports_raw_logits_separately():
-    solver = build_solvers(_compose(["solvers=[nn_recursive_mlp]"]))["nn_recursive_mlp"]
+    solver = build_solvers(_compose(["solvers=[nn_rml]"]))["nn_rml_1"]
     state = solver.state.initialise(make_clues(), GRID.shape)
 
     # (k, classes, H, W) logits underneath, (k, H, W) probabilities on the readout.
@@ -309,7 +338,7 @@ def test_the_same_seed_reproduces_the_same_trace(name):
     on the run's stopping reason rather than skipping the slow solvers.
     """
     clues = make_clues()
-    solver = build_solvers(_compose([f"solvers=[{name}]"]))[name]
+    solver = build_solvers(_compose([f"solvers=[{name}]"]))[f"{name}_1"]
     a = solver.with_seed(5).solve(clues, GRID, max_time=30.0)
     b = solver.with_seed(5).solve(clues, GRID, max_time=30.0)
 
@@ -323,7 +352,7 @@ def test_the_same_seed_reproduces_the_same_trace(name):
 def test_a_solver_that_solves_on_its_own_is_reproducible():
     """The positive case for the skip above, pinned on a solver known to finish."""
     clues = make_clues()
-    solver = build_solvers(_compose(["solvers=[backtracking_search]"]))["backtracking_search"]
+    solver = build_solvers(_compose(["solvers=[bs_sgl]"]))["bs_sgl_1"]
     a = solver.with_seed(5).solve(clues, GRID, max_time=5.0)
     b = solver.with_seed(5).solve(clues, GRID, max_time=5.0)
 
@@ -333,13 +362,13 @@ def test_a_solver_that_solves_on_its_own_is_reproducible():
 
 
 def test_a_different_seed_changes_a_stochastic_solver():
-    """`backtracking_search` picks a random cell and value per step.
+    """`bs_sgl` picks a random cell and value per step.
 
     A seed that changed nothing would mean the per-solve seeding is not
     reaching the state, which is the property this guards.
     """
     clues = make_clues()
-    solver = build_solvers(_compose(["solvers=[backtracking_search]"]))["backtracking_search"]
+    solver = build_solvers(_compose(["solvers=[bs_sgl]"]))["bs_sgl_1"]
     a = solver.with_seed(1).solve(clues, GRID, max_time=5.0)
     b = solver.with_seed(2).solve(clues, GRID, max_time=5.0)
     assert a[2] is StoppingReason.SOLVED and b[2] is StoppingReason.SOLVED
@@ -369,9 +398,7 @@ def test_run_record_is_json_shaped():
 def test_an_empty_run_records_no_losses():
     from puzzle_solvers.generate_traces.record import make_run_record
 
-    record = make_run_record(
-        np.empty((0, 25)), 0, StoppingReason.TIMEOUT, make_clues(), GRID
-    )
+    record = make_run_record(np.empty((0, 25)), 0, StoppingReason.TIMEOUT, make_clues(), GRID)
     assert record["cr_losses"] == []
     assert record["mse_losses"] == []
     assert record["solved"] is False
@@ -452,7 +479,7 @@ def test_architecture_rejects_an_output_that_does_not_divide_the_grid():
 @needs_checkpoint
 def test_a_checkpoint_for_another_grid_size_is_rejected_clearly():
     """The clue width is baked in, so a 5x5 checkpoint cannot drive a 10x10 grid."""
-    solver = build_solvers(_compose(["solvers=[nn_recursive_mlp]"]))["nn_recursive_mlp"]
+    solver = build_solvers(_compose(["solvers=[nn_rml]"]))["nn_rml_1"]
     with pytest.raises(ValueError, match="not a whole number of classes|different grid size"):
         solver.state.initialise(np.zeros((2, 10, 6), dtype=np.float32), (10, 10))
 
@@ -477,7 +504,7 @@ def test_narrower_clues_are_widened_to_the_checkpoints_width():
     assert np.array_equal(widened[:, :, :2], narrow)
     assert not widened[:, :, 2].any()
 
-    solver = build_solvers(_compose(["solvers=[nn_recursive_mlp]"]))["nn_recursive_mlp"]
+    solver = build_solvers(_compose(["solvers=[nn_rml]"]))["nn_rml_1"]
     state = solver.state.initialise(narrow, GRID.shape)
     assert state.grids.shape == (1, 5, 5)
     assert state.grids.min() >= 0.0 and state.grids.max() <= 1.0
@@ -499,9 +526,9 @@ def test_nn_grids_are_probabilities_not_logits():
     value in [0, 1] per cell, and the trained model has `sigmoid_output=False`
     with three logits per cell, so this would otherwise be silently wrong.
     """
-    state = build_solvers(_compose(["solvers=[nn_recursive_mlp]"]))[
-        "nn_recursive_mlp"
-    ].state.initialise(make_clues(), GRID.shape)
+    state = build_solvers(_compose(["solvers=[nn_rml]"]))["nn_rml_1"].state.initialise(
+        make_clues(), GRID.shape
+    )
 
     assert state.pop_of_grids.ndim == 4  # (k, classes, H, W) raw
     assert state.pop_of_grids.shape[1] == 3
@@ -514,7 +541,7 @@ def test_nn_grids_are_probabilities_not_logits():
 
 @needs_checkpoint
 def test_nn_grids_before_initialise_explain_themselves():
-    solver = build_solvers(_compose(["solvers=[nn_recursive_mlp]"]))["nn_recursive_mlp"]
+    solver = build_solvers(_compose(["solvers=[nn_rml]"]))["nn_rml_1"]
     with pytest.raises(RuntimeError, match="never initialised"):
         _ = solver.state.grids
 
@@ -525,9 +552,7 @@ def test_the_nn_solver_solves_and_its_losses_are_comparable():
     from puzzle_solvers.generate_traces.record import compute_run_losses
 
     clues = make_clues()
-    solver = build_solvers(_compose(["solvers=[nn_recursive_mlp]"]))[
-        "nn_recursive_mlp"
-    ].with_seed(0)
+    solver = build_solvers(_compose(["solvers=[nn_rml]"]))["nn_rml_1"].with_seed(0)
     steps, num_steps, reason = solver.solve(clues, GRID, max_time=60.0)
 
     assert reason is StoppingReason.SOLVED

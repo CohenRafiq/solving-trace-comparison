@@ -1,5 +1,6 @@
-nn_recursive_mlp:
-  name: nn_recursive_mlp
+nn_rml:
+  name: nn_rml
+  seeds: [1]
   # `model_path` is relative to CHECKPOINT_DIR ($MODEL_DIR, else <repo>/checkpoints)
   # and must match what `train.py` saves: <dataset>/<model_class>/<nn>.pt, both
   # names the class lowercased with no underscore. 5x5 only -- its clue width is
@@ -9,7 +10,6 @@ nn_recursive_mlp:
   state:
     _target_: puzzle_solvers.solvers.neural_network.NNState
     k: 1
-    seed: 42
     model_class: neural_models.models.recursive_mlp.RecursiveMLP
     model_path: nonogramsdataset/recursivemlp/default.pt
     # `hidden_size` is read from the checkpoint. `num_layers` is not: the model

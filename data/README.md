@@ -63,9 +63,10 @@ Ideal
 Naming convention is `[dimensions]-[entries]-[extra].jsonl` such as `5x5-100_000-no_search.jsonl`. Current code produces only puzzles with a single unique solution.
 
 ### traces_dataset
-Dataset containing puzzles, solutions, step-by-step solving traces and metadata. Solving traces are the steps a solver would take to solve the puzzle (each step is the updated grid from the previous step). Same naming convention as `base_dataset` and also stored as jsonl. Code for construction is found `pipeline/solvers` and running instruction are found `pipeline/solvers/README.md`.
+Dataset containing puzzles, solutions, step-by-step solving traces and metadata. Solving traces are the steps a solver would take to solve the puzzle (each step is the updated grid from the previous step). Same naming convention as `base_dataset` and also stored as jsonl. Code for construction is found in `src/puzzle_solvers/generate_traces` and running instructions in `src/puzzle_solvers/README.md`.
 
-Current
+Each solver run is one key in `traces`, named `{base}_{seed}` (e.g. `ac_sgl_1`); a stochastic solver config with `seeds: [1, 2, 3]` produces three runs. Each run maps directly to one run record (no wrapping list).
+
 ```json
 {
   "clues": [
@@ -82,46 +83,40 @@ Current
   "meta": {
     "shape": [5, 5],
     "density": 0.4,
-    "mean_clue_runs": 1.5
+    "mean_clue_runs": 1.5,
+    "solver_anatomy": {
+      "ac_sgl_1": {
+        "name": "ac_sgl_1",
+        "strategy": "ACPerLineStrategy",
+        "state": "ACState",
+        "aggregator": "FirstAggregator",
+        "seed": 1,
+        "stopping_condition": "close",
+        "solved_threshold": 0.2,
+        "stopping_threshold": 0.001
+      }
+    }
   },
   "traces": {
-    "mac": [{
+    "ac_sgl_1": {
       "steps": [
         [[0.25, 0.5, 1.0, 0.2, 0.2],
          [0.5, 0.333, 0.0, 0.2, 0.2],
          [0.5, 0.333, 1.0, 0.2, 0.2],
          [0.2, 0.111, 1.0, 0.059, 0.059],
          [0.1, 0.5, 1.0, 0.2, 0.077]],
-        … 15 steps total, converging to the "grid" …
+        "... one grid per step, converging to the grid ..."
       ],
-      "steps_to_solve": 5,
-      "cr_losses": [0.995, 0.947, 0.930, …, 0.929],
-      "mse_losses": [0.127, 0.080, 0.049, 0.020, 0.0, …, 0.0],
+      "clues": [[[1], [2, 1], [1, 1, 1], [1], [2]], [[2], [1, 1], [1, 3], [1], [1]]],
+      "solution": [[0, 0, 1, 0, 0], [1, 1, 0, 1, 0], [1, 0, 1, 0, 1], [0, 0, 1, 0, 0], [0, 1, 1, 0, 0]],
+      "cr_losses": [0.995, 0.947, "...", 0.929],
+      "mse_losses": [0.127, 0.080, "...", 0.0],
       "num_steps": 15,
       "solved": true,
-      "step_ratio": 2
-    }],
-    "genetic_algorithm_det": [{
-      "steps": [
-        [[0.506, 0.513, 0.519, 0.497, 0.512],
-         [0.506, 0.510, 0.470, 0.526, 0.479],
-         … 5×5 grid per step, 15 steps …
-        ],
-        …
-      ],
-      "steps_to_solve": 7,
-      "cr_losses": [1.280, 1.195, …, 0.936],
-      "mse_losses": [0.247, 0.193, …, 0.0001],
-      "num_steps": 15,
-      "solved": true,
-      "step_ratio": 2
-    }],
-    "genetic_algorithm_dep": [{ … }],
-    "gradient_descent_global_adam": [{ … }],
-    "gradient_descent_global_sgd": [{ … }],
-    "gradient_descent_bang_bang": [{ … }],
-    "model_solver": [{ … }],
-    "backtracking_search": [{ … }]
+      "stopping_reason": "SOLVED"
+    },
+    "ac_sgl_2": { "..." : "..." },
+    "gd_adm_1": { "..." : "..." }
   }
 }
 ```
@@ -183,3 +178,16 @@ Ideal
 Example solving traces:
 
 `EXAMPLE SOLVING TRACE PNG`
+
+
+head -n1 base_1000.jsonl | jq '
+def shape:
+  if type == "array" then
+    "[array len=\(length)]" + (if length > 0 then " of " + (.[0] | shape) else "" end)
+  elif type == "object" then
+    with_entries(.value |= shape)
+  else
+    type
+  end;
+shape
+'

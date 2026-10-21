@@ -1,9 +1,11 @@
 defaults:
   # A config group: every entry nests under its own key in `cfg.solvers`, so
   # two solvers never step on each other's `strategy` / `state` / `aggregator`.
-  # Select from the CLI with e.g. 'solvers=[ac_parallel,gd_adam]'.
-  - solvers: [ac_single, ac_population, ac_parallel, backtracking_population, backtracking_search, gd_adam, gd_sgd, genetic_roulette, genetic_tournament, nn_recursive_mlp]
-  # genetic_rank, 
+  # Each entry carries a `seeds` list; the factory expands it into one run per
+  # seed, named `{base}_{seed}` (e.g. ac_sgl -> ac_sgl_1, ac_sgl_2, ac_sgl_3).
+  # Select from the CLI with e.g. 'solvers=[ac_prl,gd_adm]'.
+  - solvers: [ac_sgl, ac_pop, ac_prl, bs_pop, bs_sgl, gd_adm, gd_sgd, ga_rlt, ga_tmt, nn_rml]
+  # ga_rnk, bs_pop_skp, bs_pop_wgt
   - _self_
 
 data_dir: ${oc.env:DATA_DIR,./data}
@@ -14,7 +16,6 @@ max_time: 1.0
 batch_size: 10
 workers: null
 chunksize: null
-seed: 42
 
 dataset:
   _target_: neural_models.dataset.NonogramsDataset

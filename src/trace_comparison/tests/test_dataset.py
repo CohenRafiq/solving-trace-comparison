@@ -11,9 +11,9 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from trace_comparison.blocks.dataset import TraceDataset, load_trace_dataset
 from trace_comparison.blocks.resample import Resample
 from trace_comparison.blocks.rmse import RMSESimilarity
+from trace_comparison.dataset import TraceDataset, load_trace_dataset
 from trace_comparison.gen_sim_matrix import run_experiment
 
 DATA_DIR = Path(__file__).parents[3] / "data" / "traces_dataset" / "nonograms"
@@ -54,9 +54,11 @@ def make_record(solvers, solved=None, num_steps=3, grid=(2, 2)):
     traces = {}
     for solver in solvers:
         steps = [np.full(grid, float(step), dtype=np.float32).tolist() for step in range(num_steps)]
-        traces[solver] = [
-            {"steps": steps, "num_steps": num_steps, "solved": solved.get(solver, True)},
-        ]
+        traces[solver] = {
+            "steps": steps,
+            "num_steps": num_steps,
+            "solved": solved.get(solver, True),
+        }
     return {"clues": [], "grid": [], "meta": {"shape": list(grid)}, "traces": traces}
 
 
@@ -69,7 +71,7 @@ def test_load_bs_test_keeps_jagged_steps():
     dataset = load_trace_dataset(BS_TEST)
     records = read_records(BS_TEST)
     expected = np.array(
-        [[record["traces"][solver][0]["num_steps"] for record in records] for solver in BS_SOLVERS],
+        [[record["traces"][solver]["num_steps"] for record in records] for solver in BS_SOLVERS],
         dtype=np.int32,
     )
 
@@ -88,7 +90,9 @@ def test_load_bs_test_keeps_jagged_steps():
 
 def test_missing_solver_raises(tmp_path):
     path = write_records(tmp_path / "traces.jsonl", [make_record(["a", "b"])])
-    with pytest.raises(ValueError, match="missing solvers \\['c'\\].*available \\['a', 'b'\\]"):
+    with pytest.raises(
+        ValueError, match="no run for solvers \\['a', 'c'\\].*available \\['a', 'b'\\]"
+    ):
         load_trace_dataset(path, solvers=["a", "c"], puzzle_filter=None)
 
 
@@ -100,12 +104,6 @@ def test_solvers_none_follows_first_record_and_ignores_extras(tmp_path):
     dataset = load_trace_dataset(path)
     assert dataset.solvers == ("b", "a")
     assert dataset.traces.shape == (2, 2)
-
-
-def test_run_index_out_of_range_raises(tmp_path):
-    path = write_records(tmp_path / "traces.jsonl", [make_record(["a"])])
-    with pytest.raises(ValueError, match="requested run=1"):
-        load_trace_dataset(path, run=1, puzzle_filter=None)
 
 
 def test_puzzle_filters(tmp_path):

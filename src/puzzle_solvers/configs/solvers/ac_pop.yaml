@@ -1,5 +1,6 @@
-ac_population:
-  name: ac_population
+ac_pop:
+  name: ac_pop
+  seeds: [1, 2, 3]
   # 100 independent arc-consistency sweeps, recorded as their per-cell mean.
   # ACPerLineStrategy applies one line per step in a random order, so the
   # members differ; ACParallelStrategy would make the 100 members identical.
@@ -8,7 +9,6 @@ ac_population:
   state:
     _target_: puzzle_solvers.solvers.arc_consistency.ACState
     k: 100
-    seed: 42
   aggregator:
     _target_: puzzle_solvers.aggregation.MeanAggregator
     unknown_handling: replace

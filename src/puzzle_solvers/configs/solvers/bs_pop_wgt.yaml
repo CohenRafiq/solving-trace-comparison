@@ -1,11 +1,11 @@
-backtracking_population_weighted:
-  name: backtracking_population_weighted
+bs_pop_wgt:
+  name: bs_pop_wgt
+  seeds: [1]
   strategy:
     _target_: puzzle_solvers.solvers.backtracking_search.BSStrategy
   state:
     _target_: puzzle_solvers.solvers.backtracking_search.BSState
     k: 100
-    seed: 42
   aggregator:
     _target_: puzzle_solvers.aggregation.BacktrackingWeightedAggregator
     unknown_handling: replace

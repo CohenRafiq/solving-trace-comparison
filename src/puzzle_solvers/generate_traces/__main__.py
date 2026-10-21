@@ -13,7 +13,7 @@ def main(cfg: DictConfig) -> dict:
     """Build a trace dataset from a base dataset, one column per configured solver.
 
     Overrides are plain hydra CLI syntax, e.g.
-        python -m puzzle_solvers.generate_traces max_size=100 'solvers=[ac_parallel,gd_adam]'
+        python -m puzzle_solvers.generate_traces max_size=100 'solvers=[ac_prl,gd_adm]'
     """
     return run(cfg)
 

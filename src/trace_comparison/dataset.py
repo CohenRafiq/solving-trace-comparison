@@ -37,14 +37,14 @@ def load_trace_dataset(
     solvers: list[str] | None = None,
     max_size: int | None = None,
     puzzle_filter: str | None | Callable[[Runs], bool] = "all_solved",
-    run: int = 0,
 ) -> TraceDataset:
     keep = puzzle_filter if callable(puzzle_filter) else _FILTERS.get(puzzle_filter)
     if keep is None:
         raise ValueError(
-            f"Unknown puzzle_filter {puzzle_filter!r}; expected one of {list(_FILTERS)} or a callable"
+            f"Unknown puzzle_filter {puzzle_filter!r}; "
+            f"expected one of {list(_FILTERS)} or a callable"
         )
-    
+
     grid_shape = None
     rows: list[list[np.ndarray]] = []  # rows[puzzle][solver]
 
@@ -58,11 +58,11 @@ def load_trace_dataset(
                 grid_shape = tuple(record["meta"]["shape"])
                 solvers = tuple(record["traces"]) if solvers is None else solvers
             try:
-                runs = {s: record["traces"][s][run] for s in solvers}
-            except (KeyError, IndexError) as e:
+                runs = {s: record["traces"][s] for s in solvers}
+            except KeyError as e:
                 available = list(record["traces"])
                 raise ValueError(
-                    f"{where}: no run {run} for solvers {list(solvers)} ({e!r}); available {available}"
+                    f"{where}: no run for solvers {list(solvers)} ({e!r}); available {available}"
                 ) from e
             if not keep(runs):
                 continue

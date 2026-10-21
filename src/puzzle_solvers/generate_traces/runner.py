@@ -29,7 +29,7 @@ def _iter_puzzle_args(dataset: NonogramsDataset):
 
 
 def _iter_results(cfg: DictConfig, solvers, puzzle_args):
-    initargs = (solvers, float(cfg.max_time), cfg.get("seed"))
+    initargs = (solvers, float(cfg.max_time))
 
     if cfg.workers == 1:
         pool_init(*initargs)
@@ -43,12 +43,14 @@ def _iter_results(cfg: DictConfig, solvers, puzzle_args):
 
 
 def _count_solved(record: dict, solved: Counter, attempts: Counter) -> None:
-    for name, runs in record["traces"].items():
-        solved[name] += sum(r["solved"] for r in runs)
-        attempts[name] += len(runs)
+    for name, run in record["traces"].items():
+        solved[name] += int(run["solved"])
+        attempts[name] += 1
 
 
-def _print_timing_table(totals: Counter, solved: Counter, attempts: Counter, generated: int) -> None:
+def _print_timing_table(
+    totals: Counter, solved: Counter, attempts: Counter, generated: int
+) -> None:
     if not totals:
         return
 
@@ -61,6 +63,7 @@ def _print_timing_table(totals: Counter, solved: Counter, attempts: Counter, gen
         print(f"{name:<35} {total / generated:>10.4f} {total:>10.2f} {pct:>7.1f}% {acc:>9.1f}%")
     print("-" * 76)
     print(f"{'TOTAL':<35} {grand_total / generated:>10.4f} {grand_total:>10.2f}")
+
 
 def run(cfg: DictConfig) -> dict:
     start = time.perf_counter()
