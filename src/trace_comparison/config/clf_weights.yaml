@@ -1,0 +1,14 @@
+# Dense-resample the jagged traces, then 1 - RMSE between every solver pair.
+blocks:
+  - _target_: trace_comparison.blocks.clf_weights.ClassifierWeights
+    checkpoint_dir: ${oc.env:MODEL_DIR,./checkpoints}
+    model_version: "02"
+  - _target_: trace_comparison.blocks.cosim.CosineSimilarity
+
+input: base_1000.jsonl
+solvers: null # null -> every solver in the file, in order of first appearance
+max_size: null
+puzzle_filter: all_solved # all_solved | null
+data_dir: ${oc.env:DATA_DIR,./data}
+output_file: clf_weights_temp.csv
+seed: 42

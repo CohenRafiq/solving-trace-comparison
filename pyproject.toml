@@ -51,6 +51,7 @@ format = "ruff format src"
 type-check = "mypy src"
 test = "pytest src -q"
 train = "python src/neural_models/train.py"
+train-imitation = "python src/trace_comparison/training/imitation.py"
 
 [tool.ruff]
 line-length = 100
