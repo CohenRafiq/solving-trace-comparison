@@ -29,10 +29,8 @@ class ClassifierHidden(Block):
         if not linears:
             raise ValueError("Classifier net contains no nn.Linear layers")
         self._last_linear_idx, self._last_linear = linears[-1]
-        self._first_linear = linears[0][1]
-
-        # Cache the hidden dim so output_shape is cheap and correct.
-        self._hidden_dim = self._last_linear.out_features
+        self._first_linear_idx, self._first_linear = linears[0]
+        self._hidden_dim = self._first_linear.out_features  # now 256
         self._in_features = self._first_linear.in_features
 
     def output_shape(self, input_shape: tuple[int, ...]) -> tuple[int, ...]:
@@ -51,8 +49,6 @@ class ClassifierHidden(Block):
                 f"input shape {self._in_features}"
             )
         with torch.no_grad():
-            # Run through everything *up to* (and including) the last Linear,
-            # i.e. drop the final activation/softmax that follows it.
-            hidden = self.model.net[: self._last_linear_idx + 1](torch_x)
+            hidden = self.model.net[: self._last_linear_idx](torch_x)
         hidden = hidden.reshape(x.shape[0], x.shape[1], -1)
         return hidden.cpu().numpy()

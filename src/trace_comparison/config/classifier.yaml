@@ -15,7 +15,7 @@ model_save_path: checkpoints/classifier
 
 model:
   _target_: trace_comparison.training.classifier.MLPClassifier
-  hidden: 256
+  hidden: 64
 
 optimizer:
   _target_: torch.optim.AdamW
