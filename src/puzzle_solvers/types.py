@@ -46,10 +46,11 @@ class State(ABC):
         """Initialise the parameters of the state."""
         ...
 
-    def initialise(self, clues: np.ndarray, grid_shape: tuple[int, int]) -> Self:
+    def initialise(self, clues: np.ndarray, grid_shape: tuple[int, int], puzzle_idx: int) -> Self:
         """Build the starting state. Its grid is not recorded as a step."""
         params = self._init_params(clues, grid_shape)
-        return replace(self, step=0, **params)
+        new_seed = self.seed + puzzle_idx if self.seed is not None else None
+        return replace(self, step=0, seed=new_seed, **params)
 
     @property
     def grids(self) -> np.ndarray:

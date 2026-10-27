@@ -13,6 +13,7 @@ input: 5x5-200_000-test.jsonl
 output: test.jsonl
 max_size: 5
 max_time: 1.0
+max_steps: 500
 batch_size: 10
 workers: null
 chunksize: null

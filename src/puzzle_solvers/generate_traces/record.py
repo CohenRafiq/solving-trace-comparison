@@ -53,8 +53,6 @@ def make_run_record(
     cr_losses, mse_losses = compute_run_losses(steps, clues, solution)
     return {
         "steps": [step for step in steps],
-        "clues": clues,
-        "solution": solution,
         "cr_losses": cr_losses,
         "mse_losses": mse_losses,
         "num_steps": num_steps,

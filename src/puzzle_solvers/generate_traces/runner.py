@@ -29,17 +29,22 @@ def _iter_puzzle_args(dataset: NonogramsDataset):
 
 
 def _iter_results(cfg: DictConfig, solvers, puzzle_args):
-    initargs = (solvers, float(cfg.max_time))
+    initargs = (solvers, float(cfg.max_time), int(cfg.max_steps))
 
     if cfg.workers == 1:
         pool_init(*initargs)
         yield from map(process_puzzle, puzzle_args)
         return
 
+    workers = cfg.workers
+    chunksize = 1 if cfg.chunksize is None else cfg.chunksize
+    if chunksize < 1:
+        chunksize = 1
     with mp.get_context("spawn").Pool(
-        processes=cfg.workers, initializer=pool_init, initargs=initargs
+        processes=workers, initializer=pool_init, initargs=initargs
     ) as pool:
-        yield from pool.imap_unordered(process_puzzle, puzzle_args, chunksize=cfg.chunksize)
+        for result in pool.imap_unordered(process_puzzle, puzzle_args, chunksize=chunksize):
+            yield result
 
 
 def _count_solved(record: dict, solved: Counter, attempts: Counter) -> None:

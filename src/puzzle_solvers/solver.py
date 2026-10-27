@@ -20,7 +20,7 @@ class Solver:
     seed: int | None = None
     stopping_condition: Literal["rounded", "close"] = "close"
     solved_threshold: float = 0.2
-    stopping_threshold: float = 1e-3
+    stopping_threshold: float = 1e-1
 
     def _is_solved(self, curr_pred: np.ndarray, solution: np.ndarray) -> bool:
         match self.stopping_condition:
@@ -35,11 +35,12 @@ class Solver:
         return bool(np.isclose(prev_raw, curr_raw, atol=self.stopping_threshold).all())
 
     def solve(
-        self, clues: np.ndarray, solution: np.ndarray, max_time: float
+        self, clues: np.ndarray, solution: np.ndarray, max_time: float, 
+        max_steps: int, puzzle_idx: int
     ) -> tuple[np.ndarray, int, StoppingReason]:
         """Solve the puzzle with the given clues and solution within the time limit."""
         flat_clues = np.asarray(clues, dtype=np.float32).reshape(1, -1)
-        state = self.state.initialise(clues, solution.shape)
+        state = self.state.initialise(clues, solution.shape, puzzle_idx=puzzle_idx)
         solving_traces: list[np.ndarray] = []
         prev_raw = None
         finish_time = time.monotonic() + max_time
@@ -53,6 +54,8 @@ class Solver:
                     return np.array(solving_traces), len(solving_traces), StoppingReason.SOLVED
                 if prev_raw is not None and self._has_stalled(prev_raw, curr_raw):
                     return np.array(solving_traces), len(solving_traces), StoppingReason.NO_CHANGE
+                if max_steps is not None and state.step >= max_steps:
+                    return np.array(solving_traces), len(solving_traces), StoppingReason.TIMEOUT
             prev_raw = curr_raw
         return np.array(solving_traces), len(solving_traces), StoppingReason.TIMEOUT
 

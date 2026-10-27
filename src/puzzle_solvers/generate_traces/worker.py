@@ -10,28 +10,28 @@ class _WorkerState:
     solvers: dict[str, Solver]
     anatomy: dict
     max_time: float
-
+    max_steps: int
 
 _state: _WorkerState | None = None
 
 
-def pool_init(solvers: dict[str, Solver], max_time: float) -> None:
+def pool_init(solvers: dict[str, Solver], max_time: float, max_steps: int) -> None:
     global _state
     if not solvers:
         raise RuntimeError("no solvers to run")
 
     anatomy = {name: solver.describe() for name, solver in solvers.items()}
-    _state = _WorkerState(solvers, anatomy, max_time)
+    _state = _WorkerState(solvers, anatomy, max_time, max_steps)
 
 
 def process_puzzle(puzzle_data):
-    _, puzzle_dict, clues, grid = puzzle_data
+    puzzle_idx, puzzle_dict, clues, grid = puzzle_data
     state = _state
 
     traces, timing = {}, {}
     for name, solver in state.solvers.items():
         start = time.perf_counter()
-        steps, num_steps, reason = solver.solve(clues=clues, solution=grid, max_time=state.max_time)
+        steps, num_steps, reason = solver.solve(clues=clues, solution=grid, max_time=state.max_time, max_steps=state.max_steps, puzzle_idx=puzzle_idx)
         traces[name] = make_run_record(steps, num_steps, reason, clues, grid)
         timing[name] = time.perf_counter() - start
 
