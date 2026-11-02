@@ -1,0 +1,11 @@
+defaults:
+  - blocks: rmse        # default variant
+  - _self_                  # allows this file to override/extend
+
+input: base_1000.jsonl
+solvers: null
+max_size: null
+puzzle_filter: all_solved
+data_dir: ${oc.env:DATA_DIR,./data}
+output_file: temp.csv
+seed: 42

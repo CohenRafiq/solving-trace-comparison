@@ -9,7 +9,7 @@ import pytest
 import torch
 from omegaconf import OmegaConf
 
-from trace_comparison.training.imitation import (
+from old.imitation_old import (
     ImitationGPT2,
     ImitationTraceDataset,
     PuzzleRecord,

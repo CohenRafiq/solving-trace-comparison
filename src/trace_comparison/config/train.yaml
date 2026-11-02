@@ -1,0 +1,29 @@
+# Entry point: python -m trace_comparison.training [task=<name>] [overrides]
+# The task (and the model inside it) comes from config/task/<name>.yaml, which is
+# merged *after* this file, so a task can set its own epochs / batch_size / etc.
+defaults:
+  - _self_
+  - task: imitation
+
+seed: 42
+
+# data
+data_dir: ${oc.env:DATA_DIR,./data}
+input: base_1000.jsonl            # file name under <data_dir>/traces_dataset/nonograms/
+solvers: null         # null = every solver in the file
+max_size: null
+puzzle_filter: all_solved
+k: 20                 # steps each trace is resampled to
+val_frac: 0.2
+
+# optimisation (shared by all tasks; override per task in config/task/*.yaml)
+epochs: 50
+batch_size: 128
+optimizer:
+  _target_: torch.optim.Adam
+  lr: 1.0e-3
+lr_scheduler:
+  _target_: torch.optim.lr_scheduler.CosineAnnealingLR
+  T_max: ${epochs}
+
+model_save_path: checkpoints/${task.name}

@@ -1,0 +1,14 @@
+# @package _global_
+# One solver-conditioned model that imitates every solver's trace from the puzzle clues.
+task:
+  _target_: trace_comparison.training.imitation.ImitationTask
+  _recursive_: false          # the model is built later, once input/output sizes are known
+  name: imitation
+  model:
+    _target_: trace_comparison.training.imitation.ImitationModel
+    hidden_size: 512
+    n_blocks: 6
+    embed_dim: 16
+    dropout: 0.3
+
+epochs: 100

@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 from pathlib import Path
 
-from trace_comparison.training.classifier import load_classifier
+from trace_comparison.training.common import load_model
 from trace_comparison.blocks.base import Block, DataKind
 
 

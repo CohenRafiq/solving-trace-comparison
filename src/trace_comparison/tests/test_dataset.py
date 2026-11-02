@@ -13,7 +13,7 @@ import pytest
 
 from trace_comparison.blocks.resample import Resample
 from trace_comparison.blocks.rmse import RMSESimilarity
-from trace_comparison.dataset import TraceDataset, load_trace_dataset
+from old.dataset import TraceDataset, load_trace_dataset
 from trace_comparison.gen_sim_matrix import run_experiment
 
 DATA_DIR = Path(__file__).parents[3] / "data" / "traces_dataset" / "nonograms"

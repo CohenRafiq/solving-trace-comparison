@@ -1,0 +1,13 @@
+# @package _global_
+# Predict which solver produced a trace.
+task:
+  _target_: trace_comparison.training.classifier.ClassifierTask
+  _recursive_: false
+  name: classifier
+  channel_first: false
+  model:
+    _target_: trace_comparison.training.classifier.MLPClassifier
+    hidden: 256
+    dropout: 0.3
+
+epochs: 50

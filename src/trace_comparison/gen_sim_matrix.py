@@ -8,7 +8,7 @@ from hydra.utils import instantiate
 from omegaconf import DictConfig
 
 from .blocks.base import Block, DataKind, check_kind
-from .dataset import TraceDataset, load_trace_dataset
+from .data.dataset import TraceDataset, load_trace_dataset
 
 
 def run_experiment(dataset: TraceDataset, blocks: Iterable[Block]) -> np.ndarray:
@@ -27,7 +27,7 @@ def run_experiment(dataset: TraceDataset, blocks: Iterable[Block]) -> np.ndarray
     return data
 
 
-@hydra.main(version_base=None, config_path="config", config_name="rmse")
+@hydra.main(version_base=None, config_path="config", config_name="sim_matrix")
 def main(cfg: DictConfig) -> None:
     """Build a solver-vs-solver similarity matrix from a traces jsonl file.
 

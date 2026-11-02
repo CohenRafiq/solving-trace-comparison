@@ -25,6 +25,9 @@ class TraceDataset:
     traces: np.ndarray  # (S, N) dtype=object; cell = float (T, W, H)
     solvers: tuple[str, ...]  # row order of `traces`
     grid_shape: tuple[int, int]  # (width, height), from meta.shape
+    #: Per kept puzzle (column order of `traces`): ``[row_clues, col_clues]``, each a
+    #: list of int lists.  ``None`` if any record lacks ``"clues"``.
+    clues: tuple | None = None
 
     @property
     def shape(self) -> tuple:
@@ -47,6 +50,7 @@ def load_trace_dataset(
 
     grid_shape = None
     rows: list[list[np.ndarray]] = []  # rows[puzzle][solver]
+    puzzle_clues: list[Any] = []  # puzzle_clues[puzzle]
 
     with Path(path).open(encoding="utf-8") as f:
         for i, line in enumerate(f):
@@ -67,6 +71,7 @@ def load_trace_dataset(
             if not keep(runs):
                 continue
             rows.append([np.asarray(runs[s]["steps"], dtype=np.float32) for s in solvers])
+            puzzle_clues.append(record.get("clues"))
             if max_size is not None and len(rows) >= max_size:
                 break
 
@@ -78,4 +83,5 @@ def load_trace_dataset(
     traces = np.empty((len(solvers), len(rows)), dtype=object)
     for s, p in np.ndindex(traces.shape):  # cell-wise: numpy would try to stack ragged arrays
         traces[s, p] = rows[p][s]
-    return TraceDataset(traces, solvers, grid_shape)
+    clues = tuple(puzzle_clues) if all(c is not None for c in puzzle_clues) else None
+    return TraceDataset(traces, solvers, grid_shape, clues)

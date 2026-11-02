@@ -1,0 +1,11 @@
+# @package _global_
+blocks:
+  - _target_: trace_comparison.blocks.resample.Resample
+    k: 20
+  - _target_: trace_comparison.blocks.model_latent.LatentBlock
+    checkpoint_dir: ${oc.env:MODEL_DIR,./checkpoints}
+    model_version: "04"
+    device: "cuda"
+    model_type: "imitation"
+  - _target_: trace_comparison.blocks.centroid.Centroid
+  - _target_: trace_comparison.blocks.rbf_sim.RBFCentroidSimilarity
