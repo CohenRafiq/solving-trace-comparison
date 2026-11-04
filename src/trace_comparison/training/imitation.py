@@ -4,8 +4,9 @@ from typing import Any
 
 import torch
 from torch import nn
+from torch.nn import functional as F
 
-from trace_comparison.training.common import Batch, FitResult
+from neural_models.models.recursive_mlp import ResidualBlock
 from trace_comparison.data.data import (
     clue_shape,
     encode_all_clues,
@@ -13,9 +14,9 @@ from trace_comparison.data.data import (
     select,
     split_by_puzzle,
 )
+from trace_comparison.training.common import Batch, FitResult
 from trace_comparison.training.task import Task, TaskData
-from neural_models.models.recursive_mlp import ResidualBlock
-from torch.nn import functional as F
+
 
 # --------------------------------------------------------------------- model
 class ResMLP(nn.Module):
@@ -25,7 +26,8 @@ class ResMLP(nn.Module):
         self.inp = nn.Linear(in_dim, hidden)
         self.res = ResidualBlock(hidden, dropout)          # your block, unchanged
         self.out = nn.Linear(hidden, out_dim)
-        nn.init.zeros_(self.out.weight); nn.init.zeros_(self.out.bias)  # starts as identity
+        nn.init.zeros_(self.out.weight)
+        nn.init.zeros_(self.out.bias)  # starts as identity
 
     def forward(self, x):
         return self.out(self.res(F.gelu(self.inp(x))))
@@ -65,7 +67,9 @@ class ImitationModel(nn.Module):
         self.pos_embed = nn.Parameter(torch.zeros(1, in_features))
         self.hidden_size = hidden_size
         nn.init.normal_(self.pos_embed, std=0.02)
-        self.blocks = nn.ModuleList(RevBlock(self.dim, hidden_size, dropout) for _ in range(n_blocks))
+        self.blocks = nn.ModuleList(
+            RevBlock(self.dim, hidden_size, dropout) for _ in range(n_blocks)
+        )
         self.log_scale = nn.Parameter(torch.zeros(1, self.dim))
         self.bias = nn.Parameter(torch.zeros(1, self.dim))
 
@@ -126,7 +130,7 @@ class ImitationTask(Task):
             mean = t_tr[s_tr == s].mean(0)
             mses.append(((t_va[s_va == s] - mean) ** 2).mean())
         return torch.stack(mses)
-    
+
     def build_data(self, ds, k, val_frac, seed) -> TaskData:
         if ds.clues is None:
             raise ValueError('dataset has no clues: every record needs a "clues" field')
@@ -151,7 +155,11 @@ class ImitationTask(Task):
 
     def model_kwargs(self, data: TaskData) -> dict[str, Any]:
         i = data.info
-        return {"in_features": i["in_features"], "out_features": i["out_features"], "n_solvers": i["n_solvers"]}
+        return {
+            "in_features": i["in_features"],
+            "out_features": i["out_features"],
+            "n_solvers": i["n_solvers"],
+        }
 
     def step(self, model, batch):
         clues, solver, traces = batch
@@ -164,8 +172,9 @@ class ImitationTask(Task):
     def describe(self, data: TaskData) -> None:
         i = data.info
         print(
-            f"{len(data.train[0])} train / {len(data.val[0])} val samples, {i['n_solvers']} solvers, "
-            f"clues {i['in_features']} -> trace {tuple(data.train[2].shape[1:])}"
+            f"{len(data.train[0])} train / {len(data.val[0])} val samples, "
+            f"{i['n_solvers']} solvers, clues {i['in_features']} -> "
+            f"trace {tuple(data.train[2].shape[1:])}"
         )
         print(f"baseline (per-solver mean trace) val mse {i['baseline'].mean():.4f}")
 
@@ -177,7 +186,9 @@ class ImitationTask(Task):
             "clue_shape": list(clue_shape(tuple(i["grid_shape"]))),
             "metrics": {
                 "val_loss": result.best_val_loss,
-                "val_mse_per_solver": self.per_solver_mean(out["mse"], out["solver"], i["n_solvers"]).tolist(),
+                "val_mse_per_solver": self.per_solver_mean(
+                    out["mse"], out["solver"], i["n_solvers"]
+                ).tolist(),
                 "baseline_mse_per_solver": i["baseline"].tolist(),
             },
         }
@@ -187,6 +198,9 @@ class ImitationTask(Task):
         out, i = result.best_val_outputs, data.info
         per_solver = self.per_solver_mean(out["mse"], out["solver"], i["n_solvers"]).tolist()
         print("per-solver val mse (model / mean-trace baseline):")
-        rows = sorted(zip(i["solvers"], per_solver, i["baseline"].tolist()), key=lambda t: -t[1] / t[2])
+        rows = sorted(
+            zip(i["solvers"], per_solver, i["baseline"].tolist(), strict=True),
+            key=lambda t: -t[1] / t[2],
+        )
         for name, m, b in rows:
             print(f"  {name:<12} {m:.4f} / {b:.4f}  (ratio {m / b:.2f})")

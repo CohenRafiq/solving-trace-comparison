@@ -12,7 +12,7 @@ class RBFCentroidSimilarity(Block):
     """
 
     input_kind = DataKind.DENSE
-    output_kind = DataKind.DENSE
+    output_kind = DataKind.MATRIX
 
     def output_shape(self, input_shape: tuple[int, ...]) -> tuple[int, ...]:
         if len(input_shape) != 2:

@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from utils.grid import clues_to_tuples
+
 from ...types import State
 from ..utils.const import UNKNOWN, empty_int8
 from ..utils.line_checking import line_marginal

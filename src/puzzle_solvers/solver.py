@@ -35,7 +35,7 @@ class Solver:
         return bool(np.isclose(prev_raw, curr_raw, atol=self.stopping_threshold).all())
 
     def solve(
-        self, clues: np.ndarray, solution: np.ndarray, max_time: float, 
+        self, clues: np.ndarray, solution: np.ndarray, max_time: float,
         max_steps: int, puzzle_idx: int
     ) -> tuple[np.ndarray, int, StoppingReason]:
         """Solve the puzzle with the given clues and solution within the time limit."""

@@ -5,7 +5,7 @@ blocks:
   - _target_: trace_comparison.blocks.model_latent.LatentBlock
     checkpoint_dir: ${oc.env:MODEL_DIR,./checkpoints}
     model_version: "10"
-    device: "cuda"
+    device: ${oc.env:DEVICE,cpu}
     model_type: "classifier"
   - _target_: trace_comparison.blocks.centroid.Centroid
   - _target_: trace_comparison.blocks.rbf_sim.RBFCentroidSimilarity

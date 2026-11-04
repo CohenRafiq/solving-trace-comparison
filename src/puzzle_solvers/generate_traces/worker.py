@@ -31,7 +31,13 @@ def process_puzzle(puzzle_data):
     traces, timing = {}, {}
     for name, solver in state.solvers.items():
         start = time.perf_counter()
-        steps, num_steps, reason = solver.solve(clues=clues, solution=grid, max_time=state.max_time, max_steps=state.max_steps, puzzle_idx=puzzle_idx)
+        steps, num_steps, reason = solver.solve(
+            clues=clues,
+            solution=grid,
+            max_time=state.max_time,
+            max_steps=state.max_steps,
+            puzzle_idx=puzzle_idx,
+        )
         traces[name] = make_run_record(steps, num_steps, reason, clues, grid)
         timing[name] = time.perf_counter() - start
 

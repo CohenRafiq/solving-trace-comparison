@@ -1,4 +1,5 @@
 import numpy as np
+
 from trace_comparison.blocks.base import Block, DataKind
 
 

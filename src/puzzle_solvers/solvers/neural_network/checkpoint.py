@@ -9,6 +9,7 @@ import torch
 
 from ..utils.const import CHECKPOINT_DIR, DEVICE
 
+
 def resolve(path: str) -> type[torch.nn.Module]:
     module, _, name = path.rpartition(".")
     return getattr(import_module(module), name)
@@ -56,34 +57,34 @@ def infer_architecture(state_dict: dict, grid_shape: tuple[int, int]) -> dict:
     }
 
 
-# def fit_clue_width(padded_clues: np.ndarray, input_size: int, grid_shape) -> np.ndarray:
-#     """Re-pad `padded_clues` to the clue width the checkpoint was trained at.
+def fit_clue_width(padded_clues: np.ndarray, input_size: int, grid_shape) -> np.ndarray:
+    """Re-pad `padded_clues` to the clue width the checkpoint was trained at.
 
-#     `NonogramsDataset` derives the clue width from the widest run it actually
-#     saw, so it depends on `max_size`: two 5x5 puzzles give `(2, 5, 2)` where the
-#     full file gives `(2, 5, 3)`. A checkpoint is not a function of how many
-#     puzzles were loaded, so the clues are widened to the width it expects rather
-#     than the run being rejected for its sample size.
-#     """
-#     side = int(grid_shape[0])
-#     if padded_clues.shape[0] != 2 or padded_clues.shape[1] != side:
-#         raise ValueError(
-#             f"expected clues of shape (2, {side}, K), got {tuple(padded_clues.shape)}"
-#         )
+    `NonogramsDataset` derives the clue width from the widest run it actually
+    saw, so it depends on `max_size`: two 5x5 puzzles give `(2, 5, 2)` where the
+    full file gives `(2, 5, 3)`. A checkpoint is not a function of how many
+    puzzles were loaded, so the clues are widened to the width it expects rather
+    than the run being rejected for its sample size.
+    """
+    side = int(grid_shape[0])
+    if padded_clues.shape[0] != 2 or padded_clues.shape[1] != side:
+        raise ValueError(
+            f"expected clues of shape (2, {side}, K), got {tuple(padded_clues.shape)}"
+        )
 
-#     width, found = divmod(input_size, 2 * side)
-#     if width < 1:
-#         raise ValueError(
-#             f"checkpoint's clue width {input_size} is too small for a {side}-cell line"
-#         )
+    width = input_size // (2 * side)
+    if width < 1:
+        raise ValueError(
+            f"checkpoint's clue width {input_size} is too small for a {side}-cell line"
+        )
 
-#     given = padded_clues.shape[2]
-#     if given > width:
-#         raise ValueError(
-#             f"a line needs {given} clue slots but the checkpoint was trained with {width} "
-#             f"(input size {input_size} over {side} cells): trained on a different puzzle size"
-#         )
+    given = padded_clues.shape[2]
+    if given > width:
+        raise ValueError(
+            f"a line needs {given} clue slots but the checkpoint was trained with {width} "
+            f"(input size {input_size} over {side} cells): trained on a different puzzle size"
+        )
 
-#     widened = np.zeros((2, side, width), dtype=np.float32)
-#     widened[:, :, :given] = padded_clues
-#     return widened
+    widened = np.zeros((2, side, width), dtype=np.float32)
+    widened[:, :, :given] = padded_clues
+    return widened

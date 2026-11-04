@@ -7,11 +7,9 @@ import torch.nn.functional as F
 from omegaconf import DictConfig
 from torch import nn
 
-from trace_comparison.training.common import FitResult, PerSample
 from trace_comparison.data.data import flatten_traces, select, split_by_puzzle
+from trace_comparison.training.common import FitResult, PerSample
 from trace_comparison.training.task import Task, TaskData
-
-
 
 # --------------------------------------------------------------------- model
 
@@ -67,13 +65,21 @@ class ClassifierTask(Task):
 
     def build_data(self, ds, k, val_frac, seed) -> TaskData:
         flat = flatten_traces(ds, k)
-        x = flat.traces.permute(0, 1, 3, 2).contiguous() if self.channel_first else flat.traces  # (C, H, W)
+        x = (
+            flat.traces.permute(0, 1, 3, 2).contiguous()  # (C, H, W)
+            if self.channel_first
+            else flat.traces
+        )
         train_idx, val_idx = split_by_puzzle(flat.puzzle_idx, flat.n_puzzles, val_frac, seed)
         data = (x, flat.solver_idx)  # x (M, k, W, H), y (M,)
         return TaskData(
             select(data, train_idx),
             select(data, val_idx),
-            {"classes": list(flat.solvers), "n_classes": len(flat.solvers), "in_features": x[0].numel()},
+            {
+                "classes": list(flat.solvers),
+                "n_classes": len(flat.solvers),
+                "in_features": x[0].numel(),
+            },
         )
 
     def model_kwargs(self, data: TaskData) -> dict[str, Any]:
@@ -110,5 +116,6 @@ class ClassifierTask(Task):
         confusion = self.confusion_matrix(result.best_val_outputs, data.info["n_classes"])
         per_class = (confusion.diag() / confusion.sum(1).clamp(min=1)).tolist()
         print("per-solver val accuracy:")
-        for name, a in sorted(zip(data.info["classes"], per_class), key=lambda t: t[1]):
+        pairs = zip(data.info["classes"], per_class, strict=True)
+        for name, a in sorted(pairs, key=lambda t: t[1]):
             print(f"  {name:<12} {a:.3f}")

@@ -18,7 +18,7 @@ class _GABaseStrategy(Strategy, ABC):
     def _crossover(self, rng: np.random.Generator, p1: np.ndarray, p2: np.ndarray) -> np.ndarray:
         """Crosses over two parents to produce a child."""
         axis = int(rng.integers(2))
-        take_p2 = rng.random(p1.shape[axis]) < 0.5
+        take_p2 = np.asarray(rng.random(p1.shape[axis])) < 0.5
         mask = take_p2[:, None] if axis == 0 else take_p2[None, :]
         return np.where(mask, p2, p1)
 
@@ -32,7 +32,7 @@ class _GABaseStrategy(Strategy, ABC):
         """Returns an (n, 2) array of parent index pairs to breed from, given their fitnesses."""
         ...
 
-    def __call__(self, state: GAState) -> GAState:
+    def __call__(self, state: GAState) -> GAState:  # type: ignore[override]
         """Applies the genetic algorithm strategy to the given state."""
         fitnesses = population_fitness(state.pop_of_grids, state.clue_blocks)
         new_population = np.empty_like(state.pop_of_grids)

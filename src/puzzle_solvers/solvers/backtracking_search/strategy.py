@@ -13,7 +13,7 @@ from .state import BSState, Decision
 class BSStrategy(Strategy):
     """Commit one more cell per trajectory, backtracking as far as needed to do it."""
 
-    def __call__(self, state: BSState) -> BSState:
+    def __call__(self, state: BSState) -> BSState:  # type: ignore[override]
         grid = state.pop_of_grids.copy()
         stacks = []
         for i in range(state.k):
@@ -24,7 +24,13 @@ class BSStrategy(Strategy):
 
         return replace(state, pop_of_grids=grid, stack=tuple(stacks), step=state.step + 1)
 
-    def _commit_one(self, grid: np.ndarray, stack: list[Decision], blocks: tuple, rng: np.random.Generator) -> None:
+    def _commit_one(
+        self,
+        grid: np.ndarray,
+        stack: list[Decision],
+        blocks: tuple,
+        rng: np.random.Generator,
+    ) -> None:
         d = self._pick(grid, rng)
         while True:
             grid[d.row, d.col] = d.value

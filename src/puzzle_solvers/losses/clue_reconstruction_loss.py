@@ -38,7 +38,7 @@ class ClueReconstructionLoss(nn.Module):
         return per_puzzle.sum() if self.batch_reduction == "sum" else per_puzzle.mean()
 
     def _compute(self, probs, row_clues, col_clues, binarize_weight):
-        B, N = probs.shape[0], probs.shape[1]
+        N = probs.shape[1]
         K = row_clues.shape[-1]
         probs_t = probs.transpose(1, 2)
         pred_row, cum_row = _runs(probs, K)
@@ -110,7 +110,11 @@ class ClueReconstructionLoss(nn.Module):
             raise ValueError(f"Expected (2, {N}, K) clues, got {clues.shape}")
 
         probs = torch.from_numpy(steps).float().view(n, N, N)
-        rows, cols = torch.from_numpy(np.asarray(clues[:, :N], dtype=np.float32)).unsqueeze(1).unbind(0)
+        rows, cols = (
+            torch.from_numpy(np.asarray(clues[:, :N], dtype=np.float32))
+            .unsqueeze(1)
+            .unbind(0)
+        )
         K = rows.shape[-1]
 
         row_loss = ((_runs(probs, K)[0] - rows) ** 2).sum(-1)

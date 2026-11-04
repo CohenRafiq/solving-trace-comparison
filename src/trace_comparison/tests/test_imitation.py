@@ -1,41 +1,26 @@
-"""Imitation models: record loading, batch packing, GPT-2 forward/backward, generation, saving."""
+"""Smoke tests for the current reversible imitation model and task."""
 
 import json
 from pathlib import Path
-from typing import Any
 
 import numpy as np
-import pytest
 import torch
-from omegaconf import OmegaConf
+from omegaconf import DictConfig, OmegaConf
 
-from old.imitation_old import (
-    ImitationGPT2,
-    ImitationTraceDataset,
-    PuzzleRecord,
-    collate_imitation,
-    load_imitation,
-    load_records,
-    train_one_solver,
-)
+from trace_comparison.data.dataset import load_trace_dataset
+from trace_comparison.training.imitation import ImitationModel, ImitationTask
 
-CLUES: Any = [[[1, 1], [1], [1]], [[3], [3], [1, 1]]]
-#: Same puzzle but with a shorter clue list, so collating the two right-pads the clue block.
-SHORT_CLUES: Any = [[[3], [3], [3]], [[3], [3], [3]]]
+CLUES = [[[1], [1]], [[1], [1]]]
 
 
-def make_record(step_counts: dict[str, int], clues=CLUES) -> dict:
+def make_record(step_counts: dict[str, int], grid=(2, 2), clues=CLUES) -> dict:
     traces = {}
     for solver, num_steps in step_counts.items():
         steps = [
-            np.full((3, 3), (i + 1) / 10.0, dtype=np.float32).tolist() for i in range(num_steps)
+            np.full(grid, (i + 1) / 10.0, dtype=np.float32).tolist() for i in range(num_steps)
         ]
-        traces[solver] = {
-            "steps": steps,
-            "num_steps": num_steps,
-            "solved": True,
-        }
-    return {"clues": clues, "grid": [], "meta": {"shape": [3, 3]}, "traces": traces}
+        traces[solver] = {"steps": steps, "num_steps": num_steps, "solved": True}
+    return {"clues": clues, "grid": [], "meta": {"shape": list(grid)}, "traces": traces}
 
 
 def write_records(path: Path, records: list[dict]) -> Path:
@@ -43,161 +28,61 @@ def write_records(path: Path, records: list[dict]) -> Path:
     return path
 
 
-def make_puzzle_record(record: dict) -> PuzzleRecord:
-    shape = record["meta"]["shape"]
-    return PuzzleRecord(
-        clues=record["clues"],
-        grid_shape=(int(shape[0]), int(shape[1])),
-        runs={
-            solver: np.asarray(run["steps"], dtype=np.float32)
-            for solver, run in record["traces"].items()
-        },
-    )
-
-
-def small_cfg(**overrides) -> Any:
-    cfg = {
-        "seed": 0,
-        "max_steps": 4,
-        "train_fraction": 0.5,
-        "batch_size": 2,
-        "epochs": 1,
-        "num_workers": 0,
-        "pin_memory": False,
-        "model": {
-            "_target_": "trace_comparison.training.imitation.ImitationGPT2",
-            "n_embd": 16,
-            "n_layer": 1,
-            "n_head": 2,
+def model_config() -> DictConfig:
+    return OmegaConf.create(
+        {
+            "_target_": "trace_comparison.training.imitation.ImitationModel",
+            "hidden_size": 8,
+            "n_blocks": 1,
+            "embed_dim": 2,
             "dropout": 0.0,
-        },
-        "optimizer": {
-            "_target_": "torch.optim.AdamW",
-            "lr": 1.0e-3,
-            "weight_decay": 0.0,
-        },
-        "lr_scheduler": {
-            "_target_": "torch.optim.lr_scheduler.CosineAnnealingLR",
-            "T_max": 1,
-        },
-    }
-    cfg.update(overrides)
-    return OmegaConf.create(cfg)
-
-
-def small_model(max_steps: int = 4) -> ImitationGPT2:
-    return ImitationGPT2(grid_shape=(3, 3), max_steps=max_steps, n_embd=16, n_layer=1, n_head=2)
-
-
-def test_load_records_filters_and_solvers(tmp_path):
-    path = write_records(
-        tmp_path / "traces.jsonl",
-        [make_record({"a": 2, "b": 3}), make_record({"a": 1, "b": 4})],
+        }
     )
 
-    records = load_records(path, puzzle_filter=None)
-    assert list(records[0].runs) == ["a", "b"]
-    assert records[0].grid_shape == (3, 3)
-    assert records[0].runs["a"].shape == (2, 3, 3)
-    assert records[0].runs["a"].dtype == np.float32
-    assert len(records) == 2
 
-    subset = load_records(path, solvers=["b"], max_size=1, puzzle_filter=None)
-    assert len(subset) == 1
-    assert list(subset[0].runs) == ["b"]
-
-    with pytest.raises(ValueError, match="no run for solvers"):
-        load_records(path, solvers=["nope"], puzzle_filter=None)
-    with pytest.raises(ValueError, match="puzzle_filter"):
-        load_records(path, puzzle_filter="drop_all")
-
-
-def test_dataset_and_collate_pad_masks(tmp_path):
-    # first puzzle has 8 clue runs, second 6 -> batch right-pads the second
-    path = write_records(
-        tmp_path / "traces.jsonl",
-        [make_record({"a": 4}, clues=CLUES), make_record({"a": 2}, clues=SHORT_CLUES)],
-    )
-    records = load_records(path, puzzle_filter=None)
-    dataset = ImitationTraceDataset(records, "a", max_steps=3)
-    assert len(dataset) == 2
-
-    batch = collate_imitation([dataset[0], dataset[1]])
-    assert batch["cell_in"].shape == (2, 3 * 9)  # padded to longest trace (3 steps)
-    assert batch["clue_runs"].shape == (2, 8)
-    # shorter puzzle: 2 steps of cells, 6 clue runs, padded to the batch maxima
-    assert batch["cell_mask"].tolist() == [[1] * 27, [1] * 18 + [0] * 9]
-    assert batch["clue_mask"].tolist() == [[1] * 8, [1] * 6 + [0, 0]]
-    # teacher forcing: first input is BOS, then every true cell shifted right
-    # (cells are step-major: 9 cells of 0.1 at step 1, then 9 of 0.2, ...)
-    np.testing.assert_allclose(batch["cell_in"][0, :11].numpy(), [0.5] + [0.1] * 9 + [0.2])
-    np.testing.assert_allclose(batch["cell_tgt"][0, :10].numpy(), [0.1] * 9 + [0.2])
-
-
-def test_forward_backward_and_loss():
+def test_imitation_model_forward_inverse_and_latent():
     torch.manual_seed(0)
-    records = [make_puzzle_record(make_record({"a": 3})), make_puzzle_record(make_record({"a": 2}))]
-    dataset = ImitationTraceDataset(records, "a", max_steps=4)
-    batch = collate_imitation([dataset[0], dataset[1]])
+    model = ImitationModel(
+        in_features=4,
+        out_features=12,
+        n_solvers=3,
+        n_blocks=1,
+        hidden_size=8,
+        embed_dim=2,
+    )
+    clues = torch.randn(5, 4)
+    solver = torch.randint(0, 3, (5,))
 
-    model = small_model()
-    pred = model(batch)
-    assert pred.shape == batch["cell_tgt"].shape
+    trace = model(clues, solver)
+    assert trace.shape == (5, 12)
 
-    loss = ((pred - batch["cell_tgt"]).pow(2) * batch["cell_mask"]).sum() / batch["cell_mask"].sum()
+    clues_hat, embedding_hat = model.inverse(trace)
+    assert clues_hat.shape == (5, 4)
+    assert embedding_hat.shape == (5, 2)
+    torch.testing.assert_close(clues_hat, clues, atol=1e-5, rtol=1e-5)
+
+    assert model.latent(trace).shape == (5, 12)
+
+
+def test_imitation_task_builds_data_model_and_loss(tmp_path):
+    path = write_records(
+        tmp_path / "traces.jsonl",
+        [
+            make_record({"a": 2, "b": 3}),
+            make_record({"a": 3, "b": 2}),
+            make_record({"a": 1, "b": 4}),
+        ],
+    )
+    dataset = load_trace_dataset(path, puzzle_filter=None)
+    task = ImitationTask(model_config())
+
+    data = task.build_data(dataset, k=3, val_frac=0.34, seed=0)
+    model, payload = task.build_model(data)
+
+    clues, solver, traces = data.train
+    out = model(clues, solver)
+    assert out.shape == traces.flatten(1).shape
+    assert payload["model_config"]["out_features"] == data.info["out_features"]
+
+    loss, _ = task.step(model, data.train)
     assert torch.isfinite(loss)
-    loss.backward()
-    assert model.head.weight.grad is not None
-
-
-def test_key_padding_masks_clue_and_cell_pads(tmp_path):
-    """The padded sample's predictions must match its unpadded forward pass."""
-    path = write_records(
-        tmp_path / "traces.jsonl",
-        [make_record({"a": 4}, clues=CLUES), make_record({"a": 2}, clues=SHORT_CLUES)],
-    )
-    records = load_records(path, puzzle_filter=None)
-    dataset = ImitationTraceDataset(records, "a", max_steps=4)
-
-    torch.manual_seed(0)
-    model = small_model().eval()
-    padded_batch = collate_imitation([dataset[0], dataset[1]])
-    alone = model(collate_imitation([dataset[1]]))
-    batch = model(padded_batch)
-    assert not padded_batch["cell_mask"][1].all()  # padded in both the clue and cell blocks
-    n_cells = alone.shape[1]
-    torch.testing.assert_close(alone[0], batch[1][:n_cells], atol=1e-5, rtol=1e-5)
-
-
-def test_generate_shape_and_range():
-    torch.manual_seed(0)
-    model = small_model(max_steps=5)
-    trace = model.generate(CLUES, temperature=0.1)
-    assert trace.shape == (5, 3, 3)
-    assert trace.dtype == np.float32
-    assert trace.min() >= 0.0 and trace.max() <= 1.0
-
-
-def test_train_one_solver_saves_numbered_checkpoints(tmp_path):
-    path = write_records(
-        tmp_path / "traces.jsonl",
-        [make_record({"a": 3}), make_record({"a": 2}), make_record({"a": 4})],
-    )
-    records = load_records(path, puzzle_filter=None)
-    cfg = small_cfg(max_steps=3)  # longest trace is 4 steps, so this caps it
-
-    first = train_one_solver(cfg, records, "a", tmp_path / "checkpoints", torch.device("cpu"))
-    assert first == tmp_path / "checkpoints" / "a" / "01.pt"
-    payload = torch.load(first, weights_only=True)
-    assert payload["solver"] == "a"
-    assert payload["model_config"]["grid_shape"] == (3, 3)
-    assert payload["model_config"]["max_steps"] == 3  # capped by the longest trace
-    assert "val_loss" in payload["metrics"]
-
-    second = train_one_solver(cfg, records, "a", tmp_path / "checkpoints", torch.device("cpu"))
-    assert second.name == "02.pt"
-
-    model = load_imitation(first)
-    dataset = ImitationTraceDataset(records, "a", max_steps=3)
-    batch = collate_imitation([dataset[0]])
-    assert model(batch).shape == batch["cell_tgt"].shape

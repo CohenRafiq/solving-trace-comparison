@@ -17,10 +17,13 @@ class _ACBaseStrategy(Strategy, ABC):
     def _step_member(self, rng: np.random.Generator, grid: np.ndarray, blocks: tuple) -> bool:
         ...
 
-    def __call__(self, state: ACState) -> ACState:
+    def __call__(self, state: ACState) -> ACState:  # type: ignore[override]
         grid = state.pop_of_grids.copy()
 
-        moved = [self._step_member(state.rng, grid[pop_idx], state.clue_blocks) for pop_idx in range(state.k)]
+        moved = [
+            self._step_member(state.rng, grid[pop_idx], state.clue_blocks)
+            for pop_idx in range(state.k)
+        ]
         if not any(moved):
             return state
 

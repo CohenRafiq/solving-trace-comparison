@@ -14,7 +14,9 @@ from ..utils.const import DEVICE, empty_torch
 class GDBaseState(State, ABC):
     """Base class for gradient descent state."""
 
-    pop_of_grids: torch.Tensor = field(default_factory=empty_torch)
+    pop_of_grids: torch.Tensor = field(  # type: ignore[assignment]
+        default_factory=empty_torch
+    )
     pop_grads: torch.Tensor = field(default_factory=empty_torch)
     torch_clues: torch.Tensor = field(default_factory=empty_torch)
     optimiser: torch.optim.Optimizer | None = field(

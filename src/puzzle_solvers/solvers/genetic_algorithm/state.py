@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+
 import numpy as np
 
 from utils.grid import clues_to_tuples
+
 from ...types import State
 from ..utils.const import empty_bool
 
@@ -30,4 +32,4 @@ class GAState(State):
             "pop_of_grids": self.rng.random((self.k, *grid_shape)) < density,
             "clue_blocks": clues_to_tuples(padded_clues),
         }
-        
+

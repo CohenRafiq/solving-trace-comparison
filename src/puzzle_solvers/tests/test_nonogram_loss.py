@@ -1,56 +1,57 @@
 import pytest
 import torch
 
-from old.trace_comparison_old.criterion.clue_reconstruction import ClueReconstructionLoss
+from puzzle_solvers.losses.clue_reconstruction_loss import ClueReconstructionLoss
 from utils.grid import derive_clues_from_grid
 
 
-def test_perfect_prediction_gives_zero_loss():
+def _flat_clues(grid: torch.Tensor, k: int) -> torch.Tensor:
+    row_clues, col_clues = derive_clues_from_grid(grid, K=k)
+    return torch.cat([row_clues.reshape(1, -1), col_clues.reshape(1, -1)], dim=-1)
+
+
+def test_perfect_prediction_gives_low_loss():
     grid = torch.tensor(
         [[1, 1, 0, 1], [0, 1, 0, 1], [1, 0, 0, 0], [0, 0, 1, 0]],
         dtype=torch.float32,
     )
     flat = torch.where(grid.reshape(1, -1) > 0.5, torch.tensor(6.0), torch.tensor(-6.0))
-    row_clues, col_clues = derive_clues_from_grid(grid, K=2)
-    clues = torch.cat([row_clues.reshape(1, -1), col_clues.reshape(1, -1)], dim=-1)
+    clues = _flat_clues(grid, k=2)
 
-    loss = ClueReconstructionLoss(reduction="mean")
-    per_sample, _, _, match = loss(flat, clues)
-    assert per_sample < 1e-3
-    assert match > 0.99
+    loss, metrics = ClueReconstructionLoss()(flat, clues, return_metrics=True)
+
+    assert loss < 1e-2
+    assert metrics["clue_match_pct"] > 0.99
 
 
 def test_wrong_prediction_gives_larger_loss():
-    loss = ClueReconstructionLoss(reduction="mean")
+    loss = ClueReconstructionLoss()
 
     ones = torch.full((1, 16), 6.0)
     zeros = torch.full((1, 16), -6.0)
-    row, col = derive_clues_from_grid(torch.ones(4, 4), K=2)
-    clues = torch.cat([row.reshape(1, -1), col.reshape(1, -1)], dim=-1)
+    clues = _flat_clues(torch.ones(4, 4), k=2)
 
-    loss_ones = loss(ones, clues)[0]
-    loss_zeros = loss(zeros, clues)[0]
+    loss_ones = loss(ones, clues)
+    loss_zeros = loss(zeros, clues)
     assert loss_zeros > loss_ones
 
 
-def test_reduction_modes():
-    grid = torch.full((2, 16), 6.0)
-    row, col = derive_clues_from_grid(torch.ones(4, 4), K=2)
-    clues = torch.cat([row.reshape(1, -1), col.reshape(1, -1)], dim=-1).repeat(2, 1)
+def test_batch_reduction_modes():
+    grid = torch.tensor(
+        [[1, 1, 0, 1], [0, 1, 0, 1], [1, 0, 0, 0], [0, 0, 1, 0]],
+        dtype=torch.float32,
+    )
+    flat = torch.where(grid.reshape(1, -1) > 0.5, torch.tensor(6.0), torch.tensor(-6.0))
+    clues = _flat_clues(grid, k=2)
 
-    mean = ClueReconstructionLoss(reduction="mean")
-    none = ClueReconstructionLoss(reduction="none")
-    sum_loss = ClueReconstructionLoss(reduction="sum")
+    batch = flat.repeat(2, 1)
+    batch_clues = clues.repeat(2, 1)
+    sum_loss = ClueReconstructionLoss(batch_reduction="sum")(batch, batch_clues)
+    mean_loss = ClueReconstructionLoss(batch_reduction="mean")(batch, batch_clues)
 
-    mean_out = mean(grid, clues)
-    none_out = none(grid, clues)
-    sum_out = sum_loss(grid, clues)
-
-    assert mean_out[0].shape == ()
-    assert none_out[0].shape == (2,)
-    assert torch.isclose(sum_out[0], none_out[0].sum())
+    assert torch.isclose(sum_loss, 2 * mean_loss)
 
 
 def test_invalid_reduction_raises():
     with pytest.raises(ValueError):
-        ClueReconstructionLoss(reduction="bogus")
+        ClueReconstructionLoss(batch_reduction="bogus")

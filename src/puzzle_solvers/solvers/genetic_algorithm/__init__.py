@@ -1,5 +1,5 @@
 from .state import GAState
-from .strategy import GATournamentStrategy, GARankStrategy, GARouletteStrategy
+from .strategy import GARankStrategy, GARouletteStrategy, GATournamentStrategy
 
 __all__ = [
     "GAState",

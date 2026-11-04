@@ -43,8 +43,9 @@ def _iter_results(cfg: DictConfig, solvers, puzzle_args):
     with mp.get_context("spawn").Pool(
         processes=workers, initializer=pool_init, initargs=initargs
     ) as pool:
-        for result in pool.imap_unordered(process_puzzle, puzzle_args, chunksize=chunksize):
-            yield result
+        yield from pool.imap_unordered(
+            process_puzzle, puzzle_args, chunksize=chunksize
+        )
 
 
 def _count_solved(record: dict, solved: Counter, attempts: Counter) -> None:

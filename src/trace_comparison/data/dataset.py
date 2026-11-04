@@ -48,6 +48,7 @@ def load_trace_dataset(
             f"expected one of {list(_FILTERS)} or a callable"
         )
 
+    selected = tuple(solvers) if solvers is not None else None
     grid_shape = None
     rows: list[list[np.ndarray]] = []  # rows[puzzle][solver]
     puzzle_clues: list[Any] = []  # puzzle_clues[puzzle]
@@ -60,28 +61,32 @@ def load_trace_dataset(
             where = f"{path} line {i + 1}"
             if grid_shape is None:
                 grid_shape = tuple(record["meta"]["shape"])
-                solvers = tuple(record["traces"]) if solvers is None else solvers
+                if selected is None:
+                    selected = tuple(record["traces"])
+            if selected is None:
+                raise ValueError(f"{path} contains no solver names")
             try:
-                runs = {s: record["traces"][s] for s in solvers}
+                runs = {s: record["traces"][s] for s in selected}
             except KeyError as e:
                 available = list(record["traces"])
                 raise ValueError(
-                    f"{where}: no run for solvers {list(solvers)} ({e!r}); available {available}"
+                    f"{where}: no run for solvers {list(selected)} ({e!r}); "
+                    f"available {available}"
                 ) from e
             if not keep(runs):
                 continue
-            rows.append([np.asarray(runs[s]["steps"], dtype=np.float32) for s in solvers])
+            rows.append([np.asarray(runs[s]["steps"], dtype=np.float32) for s in selected])
             puzzle_clues.append(record.get("clues"))
             if max_size is not None and len(rows) >= max_size:
                 break
 
-    if grid_shape is None:
+    if grid_shape is None or selected is None:
         raise ValueError(f"{path} contains no records")
     if not rows:
         raise ValueError(f"{path}: no puzzles kept (puzzle_filter={puzzle_filter!r})")
 
-    traces = np.empty((len(solvers), len(rows)), dtype=object)
+    traces: np.ndarray = np.empty((len(selected), len(rows)), dtype=object)
     for s, p in np.ndindex(traces.shape):  # cell-wise: numpy would try to stack ragged arrays
         traces[s, p] = rows[p][s]
     clues = tuple(puzzle_clues) if all(c is not None for c in puzzle_clues) else None
-    return TraceDataset(traces, solvers, grid_shape, clues)
+    return TraceDataset(traces, selected, grid_shape, clues)

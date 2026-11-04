@@ -1,14 +1,16 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Any, cast
 
 import numpy as np
 import torch
 import torch.nn.functional as F
 
-from .checkpoint import load_checkpoint, infer_architecture, resolve
-from ..utils.const import DEVICE, empty_torch
 from ...types import State
+from ..utils.const import DEVICE, empty_torch
+from .checkpoint import fit_clue_width, infer_architecture, load_checkpoint, resolve
+
 
 @dataclass(frozen=True)
 class NNState(State):
@@ -27,16 +29,18 @@ class NNState(State):
     model_path: str = ""
     num_layers: int = 1
     dropout: float = 0.0
-    pop_of_grids: torch.Tensor = field(default_factory=empty_torch, compare=False)
+    pop_of_grids: torch.Tensor = field(  # type: ignore[assignment]
+        default_factory=empty_torch, compare=False
+    )
     pop_of_hidden: torch.Tensor = field(default_factory=empty_torch, compare=False)
     model: torch.nn.Module | None = field(default=None, compare=False, repr=False)
 
     def _init_params(self, padded_clues: np.ndarray, grid_shape: tuple[int, int]) -> dict:
         weights = load_checkpoint(self.model_path)
         arch = infer_architecture(weights, grid_shape)
-        # clues = fit_clue_width(padded_clues, arch["input_size"], grid_shape)
+        padded_clues = fit_clue_width(padded_clues, arch["input_size"], grid_shape)
 
-        model = resolve(self.model_class)(
+        model = cast(Any, resolve(self.model_class))(
             input_shape=torch.Size(padded_clues.shape),
             output_shape=torch.Size([arch["num_classes"], *grid_shape]),
             hidden_size=arch["hidden_size"],

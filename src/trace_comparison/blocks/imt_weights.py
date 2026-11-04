@@ -1,9 +1,12 @@
+from pathlib import Path
+from typing import cast
+
 import numpy as np
 import torch
-from pathlib import Path
 
-from trace_comparison.training.common import load_model
 from trace_comparison.blocks.base import Block, DataKind
+from trace_comparison.training.common import load_model
+from trace_comparison.training.imitation import ImitationModel
 
 
 class ImitationWeights(Block):
@@ -21,7 +24,8 @@ class ImitationWeights(Block):
     def __init__(self, checkpoint_dir: str, model_version: str,
                  ref_clues: torch.Tensor | None = None, center: bool = True) -> None:
         checkpoint_path = Path(checkpoint_dir) / "imitation" / f"{model_version}.pt"
-        self.model, self.classes = load_model(checkpoint_path, device="cpu")
+        model, self.classes = load_model(checkpoint_path, device="cpu")
+        self.model = cast(ImitationModel, model)
         self.model.eval()                                   # dropout off
 
         S = self.model.solver_embedding.num_embeddings
@@ -34,7 +38,8 @@ class ImitationWeights(Block):
             sid = torch.arange(S).repeat(K)                             # (K*S,)
             out = self.model(clues, sid).view(K, S, -1).mean(0)         # (S, out_features)
             if center:
-                out = out - out.mean(dim=0, keepdim=True)               # remove what all solvers share
+                # remove what all solvers share
+                out = out - out.mean(dim=0, keepdim=True)
             Wn = out / out.norm(dim=1, keepdim=True).clamp_min(1e-12)
         self.Wn = Wn.cpu().numpy()
 

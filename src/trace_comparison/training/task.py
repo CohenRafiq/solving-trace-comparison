@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, cast
 
 from hydra.utils import instantiate
 from omegaconf import DictConfig, OmegaConf
@@ -71,13 +71,16 @@ class Task(ABC):
         return {}
 
     def report(self, result: FitResult, data: TaskData) -> None:
-        print(f"best val {format_metrics(result.best_val_loss, self.metrics(result.best_val_outputs))}")
+        metrics = self.metrics(result.best_val_outputs)
+        print(f"best val {format_metrics(result.best_val_loss, metrics)}")
 
     # ---- provided -----------------------------------------------------------
     def build_model(self, data: TaskData) -> tuple[nn.Module, dict[str, Any]]:
         """Instantiate the yaml-configured model; also return what's needed to rebuild it."""
         kwargs = self.model_kwargs(data)
-        config = OmegaConf.to_container(self.model_cfg, resolve=True)
+        config = cast(
+            dict[str, Any], OmegaConf.to_container(self.model_cfg, resolve=True)
+        )
         target = config.pop("_target_")
         config.update(kwargs)
         model = instantiate(self.model_cfg, **kwargs)

@@ -18,7 +18,12 @@ from hydra.utils import instantiate
 from omegaconf import DictConfig
 
 from trace_comparison.data.dataset import load_trace_dataset
-from trace_comparison.training.common import fit, format_metrics, resolve_path, save_checkpoint, setup_run
+from trace_comparison.training.common import (
+    fit,
+    resolve_path,
+    save_checkpoint,
+    setup_run,
+)
 from trace_comparison.training.task import Task
 
 
@@ -30,7 +35,12 @@ def main(cfg: DictConfig) -> None:
 
     data_path = resolve_path(Path(cfg.data_dir) / "traces_dataset" / "nonograms" / cfg.input)
     solvers = list(cfg.solvers) if cfg.solvers is not None else None
-    ds = load_trace_dataset(data_path, solvers=solvers, max_size=cfg.max_size, puzzle_filter=cfg.puzzle_filter)
+    ds = load_trace_dataset(
+        data_path,
+        solvers=solvers,
+        max_size=cfg.max_size,
+        puzzle_filter=cfg.puzzle_filter,
+    )
     data = task.build_data(ds, int(cfg.k), float(cfg.val_frac), int(cfg.seed or 0))
     task.describe(data)
 

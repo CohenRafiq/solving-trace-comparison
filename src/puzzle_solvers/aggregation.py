@@ -7,7 +7,7 @@ from puzzle_solvers.types import Aggregator
 
 from .losses.clue_reconstruction_loss import ClueReconstructionLoss
 from .losses.line_automata_loss import LineAutomatonLoss
-from .solvers.utils.const import UNKNOWN, EMPTY, FILLED
+from .solvers.utils.const import EMPTY, FILLED, UNKNOWN
 
 
 @dataclass(frozen=True)
@@ -31,7 +31,12 @@ class MeanAggregator(Aggregator):
             valid_mask = predictions != UNKNOWN
             valid_counts = np.sum(valid_mask, axis=0)
             valid_sums = np.sum(np.where(valid_mask, predictions, 0), axis=0)
-            return np.divide(valid_sums, valid_counts, out=np.full_like(valid_sums, 0.5), where=valid_counts > 0)
+            return np.divide(
+                valid_sums,
+                valid_counts,
+                out=np.full_like(valid_sums, 0.5),
+                where=valid_counts > 0,
+            )
 
 @dataclass(frozen=True)
 class WeightedMeanAggregator(Aggregator):

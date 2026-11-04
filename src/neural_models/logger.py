@@ -1,3 +1,5 @@
+from typing import Literal
+
 from torch import nn
 
 import wandb
@@ -18,7 +20,7 @@ class Logger:
         enabled: bool = True,
         log_every: int = 10,
         should_log_model: bool = False,
-        log: str = "gradients",
+        log: Literal["gradients", "parameters", "all"] = "gradients",
         log_freq: int = 200,
         config: dict | None = None,
     ):

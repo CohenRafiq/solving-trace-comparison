@@ -1,6 +1,7 @@
 """Triplet accuracy of a solver similarity matrix.
 
-Usage: python triplet_accuracy.py [name]   # reads $DATA_DIR/similarity_matrices/nonograms/<name>.csv
+Usage: python triplet_accuracy.py [name]
+Reads $DATA_DIR/similarity_matrices/nonograms/<name>.csv.
 """
 
 import os
@@ -31,10 +32,12 @@ def triplet_accuracy(sim: np.ndarray, level: np.ndarray) -> pd.DataFrame:
     n = len(sim)
     off_diag = ~np.eye(n, dtype=bool)  # an anchor is never compared with itself
     counts = np.zeros((len(LEVEL_PAIRS), 2), dtype=np.int64)  # (correct, total)
-    for s, l in zip(sim[off_diag].reshape(n, -1), level[off_diag].reshape(n, -1)):
-        hit = s[:, None] > s  # hit[p, q]: p ranked above q
+    sim_rows = sim[off_diag].reshape(n, -1)
+    level_rows = level[off_diag].reshape(n, -1)
+    for scores, levels in zip(sim_rows, level_rows, strict=True):
+        hit = scores[:, None] > scores  # hit[p, q]: p ranked above q
         for k, (hi, lo) in enumerate(LEVEL_PAIRS):
-            pairs = (l[:, None] == hi) & (l == lo)
+            pairs = (levels[:, None] == hi) & (levels == lo)
             counts[k] += (pairs & hit).sum(), pairs.sum()
     table = pd.DataFrame(
         counts, columns=["correct", "total"], index=[f"L{hi} > L{lo}" for hi, lo in LEVEL_PAIRS]
@@ -56,7 +59,10 @@ def load_sim_matrix(name: str) -> pd.DataFrame:
 def main() -> None:
     parser = ArgumentParser(description="Compute triplet accuracy for a similarity matrix")
     parser.add_argument(
-        "name", nargs="?", default="similarity_matrix", help="matrix file name, with or without .csv"
+        "name",
+        nargs="?",
+        default="similarity_matrix",
+        help="matrix file name, with or without .csv",
     )
     sim = load_sim_matrix(parser.parse_args().name)
     table = triplet_accuracy(sim.to_numpy(), relatedness_levels(sim.index))

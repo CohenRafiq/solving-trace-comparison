@@ -32,7 +32,7 @@ class CKASimilarity(Block):
         cross = np.linalg.norm(a.T @ b, ord="fro") ** 2
         norm_a = np.linalg.norm(a.T @ a, ord="fro")
         norm_b = np.linalg.norm(b.T @ b, ord="fro")
-        return cross / (norm_a * norm_b + self.eps)
+        return float(cross / (norm_a * norm_b + self.eps))
 
     def forward(self, x: np.ndarray) -> np.ndarray:
         # Flatten to (solvers, samples, features) and center once, not per pair.

@@ -1,10 +1,12 @@
+from pathlib import Path
+from typing import cast
+
 import numpy as np
 import torch
-import torch.nn as nn
-from pathlib import Path
 
-from trace_comparison.training.common import load_model
 from trace_comparison.blocks.base import Block, DataKind
+from trace_comparison.training.classifier import MLPClassifier
+from trace_comparison.training.common import load_model
 
 
 class ClassifierHidden(Block):
@@ -20,18 +22,14 @@ class ClassifierHidden(Block):
 
     def __init__(self, checkpoint_dir: str, model_version: str, device: str) -> None:
         checkpoint_path = Path(checkpoint_dir) / "classifier" / f"{model_version}.pt"
-        self.model, self.classes = load_classifier(checkpoint_path, device=device)
+        model, self.payload = load_model(checkpoint_path, device=device)
+        self.model = cast(MLPClassifier, model)
+        self.classes = self.payload["classes"]
         self.device = device
         self.model.eval()
 
-        # Locate the last Linear layer and its position in the Sequential.
-        linears = [(i, m) for i, m in enumerate(self.model.net) if isinstance(m, nn.Linear)]
-        if not linears:
-            raise ValueError("Classifier net contains no nn.Linear layers")
-        self._last_linear_idx, self._last_linear = linears[-1]
-        self._first_linear_idx, self._first_linear = linears[0]
-        self._hidden_dim = self._first_linear.out_features  # now 256
-        self._in_features = self._first_linear.in_features
+        self._hidden_dim = self.model.fc1.out_features
+        self._in_features = self.model.fc1.in_features
 
     def output_shape(self, input_shape: tuple[int, ...]) -> tuple[int, ...]:
         if len(input_shape) < 2:
@@ -49,6 +47,6 @@ class ClassifierHidden(Block):
                 f"input shape {self._in_features}"
             )
         with torch.no_grad():
-            hidden = self.model.net[: self._last_linear_idx](torch_x)
+            hidden = self.model.latent(torch_x)
         hidden = hidden.reshape(x.shape[0], x.shape[1], -1)
         return hidden.cpu().numpy()

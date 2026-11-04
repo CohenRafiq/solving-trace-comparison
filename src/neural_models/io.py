@@ -5,15 +5,10 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import torch
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
 from torch import nn
 
 from neural_models.logger import Logger
-
-try:
-    from omegaconf import OmegaConf
-except ImportError:  # pragma: no cover
-    OmegaConf = None
 
 
 def get_next_model_number(model_dir: Path) -> int:

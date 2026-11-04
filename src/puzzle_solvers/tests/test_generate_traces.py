@@ -266,7 +266,9 @@ def test_solving_a_real_puzzle_produces_a_trace(name):
     """
     clues = make_clues()
     solver = build_solvers(_compose([f"solvers=[{name}]"]))[f"{name}_1"].with_seed(0)
-    steps, num_steps, reason = solver.solve(clues, GRID, max_time=30.0)
+    steps, num_steps, reason = solver.solve(
+        clues, GRID, max_time=30.0, max_steps=10_000, puzzle_idx=0
+    )
 
     assert isinstance(reason, StoppingReason)
     assert num_steps == len(steps)
@@ -299,7 +301,7 @@ def test_the_readout_does_not_decide_when_a_search_stalls():
     by about `lr` per iteration, which the sigmoid then halves below `1e-3`.
     """
     solver = build_solvers(_compose(["solvers=[gd_adm]"]))["gd_adm_1"]
-    state = solver.state.initialise(make_clues(), GRID.shape)
+    state = solver.state.initialise(make_clues(), GRID.shape, puzzle_idx=0)
 
     raw = state.raw_grids
     readout = state.grids
@@ -320,7 +322,7 @@ def test_the_readout_does_not_decide_when_a_search_stalls():
 @needs_checkpoint
 def test_the_checkpointed_solver_also_reports_raw_logits_separately():
     solver = build_solvers(_compose(["solvers=[nn_rml]"]))["nn_rml_1"]
-    state = solver.state.initialise(make_clues(), GRID.shape)
+    state = solver.state.initialise(make_clues(), GRID.shape, puzzle_idx=0)
 
     # (k, classes, H, W) logits underneath, (k, H, W) probabilities on the readout.
     assert state.raw_grids.ndim == 4
@@ -339,8 +341,8 @@ def test_the_same_seed_reproduces_the_same_trace(name):
     """
     clues = make_clues()
     solver = build_solvers(_compose([f"solvers=[{name}]"]))[f"{name}_1"]
-    a = solver.with_seed(5).solve(clues, GRID, max_time=30.0)
-    b = solver.with_seed(5).solve(clues, GRID, max_time=30.0)
+    a = solver.with_seed(5).solve(clues, GRID, max_time=30.0, max_steps=10_000, puzzle_idx=0)
+    b = solver.with_seed(5).solve(clues, GRID, max_time=30.0, max_steps=10_000, puzzle_idx=0)
 
     if a[2] is StoppingReason.TIMEOUT:
         pytest.skip(f"{name} hit the time budget, so its trace is not reproducible")
@@ -353,8 +355,8 @@ def test_a_solver_that_solves_on_its_own_is_reproducible():
     """The positive case for the skip above, pinned on a solver known to finish."""
     clues = make_clues()
     solver = build_solvers(_compose(["solvers=[bs_sgl]"]))["bs_sgl_1"]
-    a = solver.with_seed(5).solve(clues, GRID, max_time=5.0)
-    b = solver.with_seed(5).solve(clues, GRID, max_time=5.0)
+    a = solver.with_seed(5).solve(clues, GRID, max_time=5.0, max_steps=10_000, puzzle_idx=0)
+    b = solver.with_seed(5).solve(clues, GRID, max_time=5.0, max_steps=10_000, puzzle_idx=0)
 
     assert a[2] is StoppingReason.SOLVED
     assert a[1] == b[1]
@@ -369,8 +371,8 @@ def test_a_different_seed_changes_a_stochastic_solver():
     """
     clues = make_clues()
     solver = build_solvers(_compose(["solvers=[bs_sgl]"]))["bs_sgl_1"]
-    a = solver.with_seed(1).solve(clues, GRID, max_time=5.0)
-    b = solver.with_seed(2).solve(clues, GRID, max_time=5.0)
+    a = solver.with_seed(1).solve(clues, GRID, max_time=5.0, max_steps=10_000, puzzle_idx=0)
+    b = solver.with_seed(2).solve(clues, GRID, max_time=5.0, max_steps=10_000, puzzle_idx=0)
     assert a[2] is StoppingReason.SOLVED and b[2] is StoppingReason.SOLVED
     assert not (a[1] == b[1] and np.array_equal(a[0], b[0]))
 
@@ -405,17 +407,21 @@ def test_an_empty_run_records_no_losses():
 
 
 def test_cr_losses_are_zero_for_a_perfect_grid_and_positive_otherwise():
-    """`grid_losses` must read probabilities directly, with no sigmoid."""
-    from puzzle_solvers.generate_traces.record import grid_losses
+    """Clue losses must read probabilities directly, with no sigmoid."""
+    from puzzle_solvers.generate_traces.record import compute_run_losses
 
     clues = make_clues()
-    assert grid_losses(GRID[None].reshape(1, -1), clues)[0] == pytest.approx(0.0)
-    assert grid_losses(np.zeros((1, 25)), clues)[0] > 0.0
-    assert grid_losses(np.ones((1, 25)), clues)[0] > 0.0
+
+    def grid_losses(steps: np.ndarray) -> list[float]:
+        return compute_run_losses(steps, clues, GRID)[0]
+
+    assert grid_losses(GRID[None].reshape(1, -1))[0] == pytest.approx(0.0)
+    assert grid_losses(np.zeros((1, 25)))[0] > 0.0
+    assert grid_losses(np.ones((1, 25)))[0] > 0.0
 
     perturbed = GRID.copy()
     perturbed[0] = [1, 1, 1, 0, 0]
-    assert grid_losses(perturbed[None].reshape(1, -1), clues)[0] > 0.0
+    assert grid_losses(perturbed[None].reshape(1, -1))[0] > 0.0
 
 
 # -- the checkpointed solver -------------------------------------------
@@ -481,7 +487,9 @@ def test_a_checkpoint_for_another_grid_size_is_rejected_clearly():
     """The clue width is baked in, so a 5x5 checkpoint cannot drive a 10x10 grid."""
     solver = build_solvers(_compose(["solvers=[nn_rml]"]))["nn_rml_1"]
     with pytest.raises(ValueError, match="not a whole number of classes|different grid size"):
-        solver.state.initialise(np.zeros((2, 10, 6), dtype=np.float32), (10, 10))
+        solver.state.initialise(
+            np.zeros((2, 10, 6), dtype=np.float32), (10, 10), puzzle_idx=0
+        )
 
 
 @needs_checkpoint
@@ -493,29 +501,31 @@ def test_narrower_clues_are_widened_to_the_checkpoints_width():
     on. Widening is lossless -- the extra slots are the zeros the narrower array
     already implied -- so it must not be an error.
     """
-    from puzzle_solvers.solvers.neural_network.state import _fit_clue_width
+    from puzzle_solvers.solvers.neural_network.checkpoint import fit_clue_width
 
     narrow = make_clues(k=2)
     assert narrow.shape == (2, 5, 2)
 
-    widened = _fit_clue_width(narrow, input_size=30, grid_shape=(5, 5))
+    widened = fit_clue_width(narrow, input_size=30, grid_shape=(5, 5))
     assert widened.shape == (2, 5, 3)
     # Right-padding only: nothing that was there is moved or lost.
     assert np.array_equal(widened[:, :, :2], narrow)
     assert not widened[:, :, 2].any()
 
     solver = build_solvers(_compose(["solvers=[nn_rml]"]))["nn_rml_1"]
-    state = solver.state.initialise(narrow, GRID.shape)
+    state = solver.state.initialise(narrow, GRID.shape, puzzle_idx=0)
     assert state.grids.shape == (1, 5, 5)
     assert state.grids.min() >= 0.0 and state.grids.max() <= 1.0
 
 
 def test_clues_wider_than_the_checkpoint_are_rejected():
     """The other direction cannot be rescued: the slots are not there to hold it."""
-    from puzzle_solvers.solvers.neural_network.state import _fit_clue_width
+    from puzzle_solvers.solvers.neural_network.checkpoint import fit_clue_width
 
     with pytest.raises(ValueError, match="trained with 2"):
-        _fit_clue_width(np.zeros((2, 5, 3), dtype=np.float32), input_size=20, grid_shape=(5, 5))
+        fit_clue_width(
+            np.zeros((2, 5, 3), dtype=np.float32), input_size=20, grid_shape=(5, 5)
+        )
 
 
 @needs_checkpoint
@@ -527,7 +537,7 @@ def test_nn_grids_are_probabilities_not_logits():
     with three logits per cell, so this would otherwise be silently wrong.
     """
     state = build_solvers(_compose(["solvers=[nn_rml]"]))["nn_rml_1"].state.initialise(
-        make_clues(), GRID.shape
+        make_clues(), GRID.shape, puzzle_idx=0
     )
 
     assert state.pop_of_grids.ndim == 4  # (k, classes, H, W) raw
@@ -553,7 +563,9 @@ def test_the_nn_solver_solves_and_its_losses_are_comparable():
 
     clues = make_clues()
     solver = build_solvers(_compose(["solvers=[nn_rml]"]))["nn_rml_1"].with_seed(0)
-    steps, num_steps, reason = solver.solve(clues, GRID, max_time=60.0)
+    steps, num_steps, reason = solver.solve(
+        clues, GRID, max_time=60.0, max_steps=10_000, puzzle_idx=0
+    )
 
     assert reason is StoppingReason.SOLVED
     assert num_steps == len(steps)

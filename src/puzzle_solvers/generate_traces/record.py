@@ -2,8 +2,10 @@ import numpy as np
 import torch
 
 from neural_models.dataset import NonogramsDataset
-from ..types import StoppingReason
+
 from ..losses.clue_reconstruction_loss import ClueReconstructionLoss
+from ..types import StoppingReason
+
 
 def to_serialisable(x):
     if torch.is_tensor(x):

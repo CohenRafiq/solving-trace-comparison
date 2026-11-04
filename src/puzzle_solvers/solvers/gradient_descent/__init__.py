@@ -1,4 +1,4 @@
-from .state import GDSGDState, GDAdamState
+from .state import GDAdamState, GDSGDState
 from .strategy import GDStrategy
 
 __all__ = [

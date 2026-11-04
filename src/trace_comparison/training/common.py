@@ -78,7 +78,7 @@ def run_epoch(
             batch_idx = idx[i : i + batch_size]
             batch = tuple(t[batch_idx].to(device) for t in data)
             loss, per_sample = step(model, batch)
-            if training:
+            if optimizer is not None:
                 optimizer.zero_grad(set_to_none=True)
                 loss.backward()
                 optimizer.step()
@@ -128,7 +128,10 @@ def fit(
         )
         if val_loss < best.best_val_loss:
             best = FitResult(
-                epoch, val_loss, val_out, {k: v.detach().clone() for k, v in model.state_dict().items()}
+                epoch,
+                val_loss,
+                val_out,
+                {k: v.detach().clone() for k, v in model.state_dict().items()},
             )
     return best
 

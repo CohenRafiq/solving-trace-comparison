@@ -12,6 +12,7 @@ def reset_cwd_and_env() -> Path:
     os.chdir(ROOT)
     os.environ["DATA_DIR"] = str(ROOT / "data")
     os.environ["MODEL_DIR"] = str(ROOT / "checkpoints")
+    return ROOT
 
 
 def load_traces_dataset(dataset_name: str = "test") -> pd.DataFrame:

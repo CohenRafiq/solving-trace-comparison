@@ -62,7 +62,10 @@ def build_line_automata(line_clues: torch.Tensor) -> LineAutomata:
 
     valid = s[None, :] < n_states[:, None]
     start = valid & (s[None, :] <= 1)
-    accept = valid & ((s[None, :] == (n_states - 1)[:, None]) | (s[None, :] == (n_states - 2)[:, None]))
+    accept = valid & (
+        (s[None, :] == (n_states - 1)[:, None])
+        | (s[None, :] == (n_states - 2)[:, None])
+    )
     return LineAutomata(is_one, valid, start, accept)
 
 
@@ -90,7 +93,9 @@ def grid_to_clues_hard(x: torch.Tensor, K: int):
     x = x.float()
     prev = F.pad(x[:, :-1], (1, 0))
     run_id = ((x * (1 - prev)).cumsum(-1) * x).long()
-    out = torch.zeros(x.shape[0], K + 2, device=x.device).scatter_add_(1, run_id.clamp(max=K + 1), x)
+    out = torch.zeros(x.shape[0], K + 2, device=x.device).scatter_add_(
+        1, run_id.clamp(max=K + 1), x
+    )
     return out[:, 1 : K + 1], out[:, K + 1] > 0
 
 
@@ -134,7 +139,12 @@ class LineAutomatonLoss(nn.Module):
         rc, cc, K = split_clues(clues, N)
         return build_line_automata(torch.cat([rc, cc], dim=1).reshape(-1, K))
 
-    def forward(self, logits: torch.Tensor, clues: torch.Tensor, automata: LineAutomata = None):
+    def forward(
+        self,
+        logits: torch.Tensor,
+        clues: torch.Tensor,
+        automata: LineAutomata | None = None,
+    ):
         B = clues.shape[0]
         N = int(round((logits.numel() // B) ** 0.5))
         assert N * N * B == logits.numel(), "grid must be square"

@@ -1,16 +1,21 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
+
 import numpy as np
 
 from utils.grid import clues_to_tuples
+
 from ...types import State
-from ..utils.const import UNKNOWN, EMPTY, FILLED, empty_int8
+from ..utils.const import EMPTY, FILLED, UNKNOWN, empty_int8
 
 
 @dataclass(frozen=True)
 class Decision:
-    """A placed cell. `flipped` means the alternative is already in use, so nothing is left to try."""
+    """A placed cell.
+
+    `flipped` means the alternative is already in use, so nothing is left to try.
+    """
     row: int
     col: int
     value: int

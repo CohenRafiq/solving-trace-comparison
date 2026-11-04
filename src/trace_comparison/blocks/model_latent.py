@@ -1,11 +1,13 @@
+from pathlib import Path
+from typing import cast
+
 import numpy as np
 import torch
-import torch.nn as nn
-from pathlib import Path
 
-from trace_comparison.training.common import load_model
 from trace_comparison.blocks.base import Block, DataKind
-
+from trace_comparison.training.classifier import MLPClassifier
+from trace_comparison.training.common import load_model
+from trace_comparison.training.imitation import ImitationModel
 
 
 class LatentBlock(Block):
@@ -19,11 +21,18 @@ class LatentBlock(Block):
     input_kind = DataKind.DENSE
     output_kind = DataKind.DENSE
 
-    def __init__(self, checkpoint_dir: str, model_version: str, model_type: str, device: str) -> None:
+    def __init__(
+        self, checkpoint_dir: str, model_version: str, model_type: str, device: str
+    ) -> None:
         checkpoint_path = Path(checkpoint_dir) / model_type / f"{model_version}.pt"
-        self.model, self.payload = load_model(checkpoint_path, device=device)
+        model, self.payload = load_model(checkpoint_path, device=device)
+        self.model = cast(MLPClassifier | ImitationModel, model)
         self.model_type = model_type
-        self.hidden_dim = self.payload["model_config"]["hidden"]
+        self.hidden_dim = (
+            int(self.payload["model_config"]["hidden"])
+            if model_type == "classifier"
+            else None
+        )
         self.device = device
         self.model.eval()
 
@@ -33,9 +42,18 @@ class LatentBlock(Block):
                 f"Input shape must have at least 2 dimensions, got {input_shape}"
             )
         if self.model_type == "classifier":
+            assert self.hidden_dim is not None
             return (input_shape[0], input_shape[1], self.hidden_dim)
-        else:
-            return (input_shape[0], input_shape[1], input_shape[2] * input_shape[3] * input_shape[4])
+        if len(input_shape) < 5:
+            raise ValueError(
+                "Imitation latent input must be "
+                f"(solvers, puzzles, steps, height, width), got {input_shape}"
+            )
+        return (
+            input_shape[0],
+            input_shape[1],
+            input_shape[2] * input_shape[3] * input_shape[4],
+        )
 
     def forward(self, x: np.ndarray) -> np.ndarray:
         torch_x = torch.from_numpy(x).to(self.device)

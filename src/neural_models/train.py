@@ -1,3 +1,5 @@
+from typing import Any
+
 import hydra
 import torch
 from hydra.utils import instantiate
@@ -14,7 +16,7 @@ class Trainer:
         self,
         model: nn.Module,
         optimizer: torch.optim.Optimizer,
-        criterion: nn.Module,
+        criterion: Any,
         device: torch.device,
     ):
         self.model = model
@@ -25,7 +27,7 @@ class Trainer:
     def run_epoch(self, data_loader: DataLoader, train: bool):
         self.model.train(train)
         total_loss, total_acc, n = 0.0, 0.0, 0
-        additional_metrics = {}
+        additional_metrics: dict[str, float] = {}
 
         with torch.set_grad_enabled(train):
             for inputs, mask, targets in data_loader:
@@ -103,7 +105,7 @@ def main(cfg: DictConfig):
     if cfg.seed:
         torch.manual_seed(cfg.seed)
 
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
     train_dataset = instantiate(cfg.train_dataset)

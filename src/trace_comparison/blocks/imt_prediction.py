@@ -1,11 +1,10 @@
-import numpy as np
-import torch
-import torch.nn as nn
 from pathlib import Path
 
-from trace_comparison.training.common import load_model
-from trace_comparison.blocks.base import Block, DataKind
+import numpy as np
+import torch
 
+from trace_comparison.blocks.base import Block, DataKind
+from trace_comparison.training.common import load_model
 
 
 class ImitationPrediction(Block):
@@ -19,7 +18,9 @@ class ImitationPrediction(Block):
     input_kind = DataKind.DENSE
     output_kind = DataKind.DENSE
 
-    def __init__(self, checkpoint_dir: str, model_version: str, model_type: str, device: str) -> None:
+    def __init__(
+        self, checkpoint_dir: str, model_version: str, model_type: str, device: str
+    ) -> None:
         checkpoint_path = Path(checkpoint_dir) / model_type / f"{model_version}.pt"
         self.model, self.payload = load_model(checkpoint_path, device=device)
         self.device = device

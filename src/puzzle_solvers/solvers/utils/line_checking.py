@@ -88,6 +88,7 @@ def _sweep(
         leftmost_start += block_size + 1
 
     # The last block must leave no FILLED cell to its right.
+    assert previous_prefix_sums is not None
     lowest = max(
         0,
         after_last_filled[line_length] - previous_block_size - previous_block_start,

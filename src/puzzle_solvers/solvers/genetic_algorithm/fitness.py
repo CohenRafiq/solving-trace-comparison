@@ -1,6 +1,7 @@
-import numpy as np
 from functools import lru_cache
 from itertools import accumulate, combinations
+
+import numpy as np
 
 
 @lru_cache(maxsize=10_000)
@@ -8,8 +9,13 @@ def _valid_masks(n: int, clues: tuple[int, ...]) -> np.ndarray:
     """All n-bit masks (index 0 -> MSB) whose runs equal `clues`. Treat as read-only."""
     offs = (0, *accumulate(clues))           # offs[i] = total length of blocks before i
     return np.array(
-        [sum(((1 << b) - 1) << (n - p - o - b) for b, o, p in zip(clues, offs, ps))
-         for ps in combinations(range(n - sum(clues) + 1), len(clues))],
+        [
+            sum(
+                ((1 << b) - 1) << (n - p - o - b)
+                for b, o, p in zip(clues, offs, ps, strict=False)
+            )
+            for ps in combinations(range(n - sum(clues) + 1), len(clues))
+        ],
         dtype=np.int64,
     )
 
