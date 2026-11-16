@@ -62,6 +62,7 @@ def run_epoch(
     batch_size: int,
     device: torch.device,
     optimizer: torch.optim.Optimizer | None = None,
+    grad_clip: float | None = None,
 ) -> tuple[float, PerSample]:
     """One pass over ``data``; returns ``(mean loss, per-sample outputs)``.
 
@@ -81,6 +82,8 @@ def run_epoch(
             if optimizer is not None:
                 optimizer.zero_grad(set_to_none=True)
                 loss.backward()
+                if grad_clip:
+                    nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
                 optimizer.step()
             loss_sum += loss.detach() * len(batch_idx)
             for key, value in per_sample.items():
@@ -115,11 +118,14 @@ def fit(
     epochs: int,
     batch_size: int,
     device: torch.device,
+    grad_clip: float | None = 1.0,
 ) -> FitResult:
     """Train for ``epochs`` epochs, tracking the best validation loss."""
     best = FitResult(0, float("inf"), {}, {})
     for epoch in range(1, epochs + 1):
-        train_loss, train_out = run_epoch(model, train_data, step, batch_size, device, optimizer)
+        train_loss, train_out = run_epoch(
+            model, train_data, step, batch_size, device, optimizer, grad_clip
+        )
         val_loss, val_out = run_epoch(model, val_data, step, batch_size, device)
         scheduler.step()
         print(
@@ -131,8 +137,10 @@ def fit(
                 epoch,
                 val_loss,
                 val_out,
-                {k: v.detach().clone() for k, v in model.state_dict().items()},
+                {k: v.detach().cpu().clone() for k, v in model.state_dict().items()},
             )
+    if not best.best_state:
+        raise RuntimeError("no finite validation loss; check lr/data")
     return best
 
 
@@ -142,10 +150,11 @@ def fit(
 def save_checkpoint(model: nn.Module, save_root: Path, extra: dict[str, Any]) -> Path:
     """Save state dict + rebuild info under ``save_root/NN.pt``."""
     save_root.mkdir(parents=True, exist_ok=True)
-    number = max((int(p.stem) for p in save_root.glob("[0-9][0-9].pt")), default=0) + 1
+    number = max((int(p.stem) for p in save_root.glob("*.pt") if p.stem.isdigit()), default=0) + 1
     path = save_root / f"{number:02d}.pt"
     torch.save({**extra, "model_state_dict": model.state_dict()}, path)
     return path
+
 
 def rebuild_model(payload: dict[str, Any], default_target: str | None = None) -> nn.Module:
     """Rebuild a model from a checkpoint payload using the class path stored with it."""
@@ -156,9 +165,23 @@ def rebuild_model(payload: dict[str, Any], default_target: str | None = None) ->
     model.load_state_dict(payload["model_state_dict"])
     return model
 
-def load_model(path: str | Path, device: str | torch.device = "cpu"
-               ) -> tuple[nn.Module, dict[str, Any]]:
-    """Rebuild a model from a checkpoint payload using the class path stored with it."""
+
+def load_model(
+    path: str | Path, device: str | torch.device = "cpu"
+) -> tuple[nn.Module, dict[str, Any]]:
+    """Load a checkpoint -> ``(model in eval mode, payload)``."""
     payload = torch.load(path, map_location=device, weights_only=True)
-    model = rebuild_model(payload, default_target=payload.get("model_target"))
-    return model.to(device).eval(), payload
+    return rebuild_model(payload).to(device).eval(), payload
+
+def load_latest(
+    checkpoint_path: str | Path, model_type: str, device: str | torch.device = "cpu"
+) -> tuple[nn.Module, dict[str, Any]]:
+    """Load the latest checkpoint for a model type from a directory."""
+    checkpoint_dir = Path(checkpoint_path) / model_type
+    
+    if not checkpoint_dir.exists():
+        raise ValueError(f"checkpoint dir {checkpoint_dir} does not exist")
+    latest = max((p for p in checkpoint_dir.glob("*.pt") if p.stem.isdigit()), default=None)
+    if latest is None:
+        raise ValueError(f"no checkpoints found in {checkpoint_dir}")
+    return load_model(latest, device=device)

@@ -11,8 +11,8 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from trace_comparison.blocks.resample import Resample
-from trace_comparison.blocks.rmse import RMSESimilarity
+from trace_comparison.blocks.resample.resample import Resample
+from trace_comparison.blocks.compare.rmse import RMSESimilarity
 from trace_comparison.data.dataset import TraceDataset, load_trace_dataset
 from trace_comparison.gen_sim_matrix import run_experiment
 

@@ -53,7 +53,8 @@ def main(cfg: DictConfig) -> None:
         model, data.train, data.val, task.step, task.metrics,
         optimizer=optimizer, scheduler=scheduler,
         epochs=int(cfg.epochs), batch_size=int(cfg.batch_size), device=device,
-    )  # fmt: skip
+        grad_clip=cfg.get("grad_clip", 1.0),
+    )
 
     model.load_state_dict(result.best_state)
     path = save_checkpoint(

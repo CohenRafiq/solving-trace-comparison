@@ -2,5 +2,5 @@
 blocks:
   - _target_: trace_comparison.blocks.clf_weights.ClassifierWeights
     checkpoint_dir: ${oc.env:MODEL_DIR,./checkpoints}
-    model_version: "06"
+    model_version: "20"
   - _target_: trace_comparison.blocks.cosim.CosineSimilarity

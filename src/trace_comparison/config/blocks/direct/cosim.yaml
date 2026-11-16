@@ -1,0 +1,11 @@
+# @package _global_
+blocks:
+  - name: resample
+    k: 5
+  - name: subtract_puzzle
+  - name: l2norm
+  - name: pca
+    emb_dim: 25
+    whiten: True
+  - name: cosine
+  - name: matrix_rank

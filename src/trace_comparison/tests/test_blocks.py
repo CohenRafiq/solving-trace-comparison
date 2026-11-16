@@ -5,10 +5,10 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from trace_comparison.blocks.clf_hidden import ClassifierHidden
-from trace_comparison.blocks.clf_weights import ClassifierWeights
-from trace_comparison.blocks.imt_weights import ImitationWeights
-from trace_comparison.blocks.model_latent import LatentBlock
+from trace_comparison.blocks.embedding.clf_hidden import ClassifierHidden
+from trace_comparison.blocks.embedding.clf_weights import ClassifierWeights
+from trace_comparison.blocks.embedding.imt_weights import ImitationWeights
+from trace_comparison.blocks.embedding.model_latent import LatentBlock
 
 CKPT = Path(__file__).parents[3] / "checkpoints"
 

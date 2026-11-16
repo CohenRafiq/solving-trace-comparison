@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 import torch
+from omegaconf import DictConfig
 from torch import nn
 from torch.nn import functional as F
 
@@ -54,9 +55,12 @@ class RevBlock(nn.Module):
 
 
 class ImitationModel(nn.Module):
+    """Unchanged except: ``dropout`` must stay 0 (the inverse is only exact without it)."""
+
     def __init__(self, in_features, out_features, n_solvers,
                  n_blocks=6, hidden_size=256, embed_dim=16, dropout=0.0):
         super().__init__()
+        assert dropout == 0.0, "dropout makes the inverse inexact; the encoder path needs it off"
         assert in_features + embed_dim <= out_features, (
             f"need out_features >= in_features + embed_dim "
             f"({out_features} < {in_features} + {embed_dim}); reduce embed_dim"
@@ -109,9 +113,20 @@ class ImitationModel(nn.Module):
 # ------------------------------------------------------------ step / metrics
 
 
-
 class ImitationTask(Task):
     name = "imitation"
+
+    def __init__(
+        self,
+        model: DictConfig,
+        name: str | None = None,
+        w_clue: float = 0.3,
+        w_solver: float = 0.0,
+        w_pad: float = 0.3,
+        tau: float = 0.1,
+    ):
+        super().__init__(model, name)
+        self.w_clue, self.w_solver, self.w_pad, self.tau = w_clue, w_solver, w_pad, tau
 
     @staticmethod
     def per_solver_mean(values: torch.Tensor, solver: torch.Tensor, n_solvers: int) -> torch.Tensor:
@@ -163,11 +178,45 @@ class ImitationTask(Task):
 
     def step(self, model, batch):
         clues, solver, traces = batch
-        err = (model(clues, solver) - traces.flatten(1)) ** 2
-        return err.mean(), {"mse": err.mean(1), "solver": solver}
+        traces = traces.flatten(1)
+        clues = clues.flatten(1)
+
+        # forward: (clues, solver) -> trace
+        fwd = ((model(clues, solver) - traces) ** 2).mean(1)
+
+        # inverse on *real* traces: this is the encoder direction, so train it directly
+        (c_hat, e_hat), states = model.inverse(traces, return_hidden=True)
+        inv_clue = ((c_hat - clues) ** 2).mean(1)
+        logits = F.normalize(e_hat, dim=-1) @ F.normalize(model.solver_embedding.weight, dim=-1).T
+        inv_solver = F.cross_entropy(logits / self.tau, solver, reduction="none")
+        inv_pad = (states[0][:, model.n + model.embed_dim:] ** 2).mean(1)  # should be ~0
+
+        loss = (
+            fwd + self.w_clue * inv_clue + self.w_solver * inv_solver + self.w_pad * inv_pad
+        ).mean()
+        return loss, {
+            "mse": fwd,
+            "solver": solver,
+            "pred": logits.argmax(1),
+            "inv_clue": inv_clue,
+            "inv_pad": inv_pad,
+        }
 
     def metrics(self, out):
-        return {"mse": out["mse"].mean().item()}
+        return {
+            "mse": out["mse"].mean().item(),
+            "acc": (out["pred"] == out["solver"]).float().mean().item(),
+            "inv_clue": out["inv_clue"].mean().item(),
+            "inv_pad": out["inv_pad"].mean().item(),
+        }
+
+    def monitor(self, val_loss, out):
+        """Best epoch = best imitation + inverse fit, ignoring the solver cross-entropy."""
+        return (
+            out["mse"].mean()
+            + self.w_clue * out["inv_clue"].mean()
+            + self.w_pad * out["inv_pad"].mean()
+        ).item()
 
     def describe(self, data: TaskData) -> None:
         i = data.info
@@ -180,12 +229,15 @@ class ImitationTask(Task):
 
     def checkpoint_extras(self, result: FitResult, data: TaskData) -> dict[str, Any]:
         out, i = result.best_val_outputs, data.info
+        puzzles = torch.cat([data.train[0], data.val[0]]).unique(dim=0)  # distinct encoded clues
         return {
+            "ref_clues": puzzles[torch.randperm(len(puzzles))[:256]],  # for ImitationWeights
             "solvers": i["solvers"],
             "grid_shape": i["grid_shape"],
             "clue_shape": list(clue_shape(tuple(i["grid_shape"]))),
             "metrics": {
                 "val_loss": result.best_val_loss,
+                **{f"val_{k}": v for k, v in self.metrics(out).items()},
                 "val_mse_per_solver": self.per_solver_mean(
                     out["mse"], out["solver"], i["n_solvers"]
                 ).tolist(),

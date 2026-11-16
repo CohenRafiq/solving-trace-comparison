@@ -4,26 +4,47 @@ from pathlib import Path
 import hydra
 import numpy as np
 import pandas as pd
-from hydra.utils import instantiate
 from omegaconf import DictConfig
+import time
 
-from .blocks.base import Block, DataKind, check_kind
-from .data.dataset import TraceDataset, load_trace_dataset
+from .blocks import BLOCKS
+from .blocks.base import Block, DataKind
+from .data.dataset import load_trace_dataset
+
+def build_blocks(cfg: DictConfig, grid_shape: tuple[int, int]) -> list[Block]:
+    """Instantiate blocks from config."""
+    blocks = []
+    for block_cfg in cfg.blocks:
+        block_type = block_cfg.name  # Access as attribute
+        if block_type not in BLOCKS:
+            raise ValueError(f"Unknown block type {block_type}")
+        block_class = BLOCKS[block_type]
+        # Create dict of kwargs excluding 'name', without mutating original
+        kwargs = {k: v for k, v in block_cfg.items() if k != "name"}
+        blocks.append(block_class(**kwargs))
+    
+    setup_ctx = {"grid_shape": grid_shape}
+    for b in blocks:
+        setup_ctx.update(b.get_context())
+    for b in blocks:
+        b.set_context(setup_ctx)
+    return blocks
 
 
-def run_experiment(dataset: TraceDataset, blocks: Iterable[Block]) -> np.ndarray:
+def run_experiment(data: np.ndarray, blocks: Iterable[Block]) -> np.ndarray:
     """Pipe the jagged `(solvers, puzzles)` traces through blocks into an `(S, S)` matrix.
 
     Each block validates its own input and output (see `Block.__call__`).
     """
-    data = dataset.traces
     for i, block in enumerate(blocks, start=1):
+        start = time.perf_counter()
         try:
             data = block(data)
         except Exception as e:
             e.add_note(f"raised in pipeline block {i}")
             raise
-    check_kind(data, DataKind.MATRIX, "pipeline output")
+        print(f"Block {block.name}: {time.perf_counter() - start:.3}")
+    DataKind.MATRIX.check(data, "pipeline output")
     return data
 
 
@@ -41,7 +62,9 @@ def main(cfg: DictConfig) -> None:
         max_size=cfg.max_size,
         puzzle_filter=cfg.puzzle_filter,
     )
-    matrix = run_experiment(dataset, instantiate(cfg.blocks))
+    blocks = build_blocks(cfg, dataset.grid_shape)
+    data = dataset.clues if cfg.get("clue_input", False) else dataset.traces
+    matrix = run_experiment(data, blocks)
     df = pd.DataFrame(matrix, index=dataset.solvers, columns=dataset.solvers, dtype=float)
 
     out = data_dir / "similarity_matrix" / "nonograms" / cfg.output_file

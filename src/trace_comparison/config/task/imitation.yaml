@@ -6,9 +6,6 @@ task:
   name: imitation
   model:
     _target_: trace_comparison.training.imitation.ImitationModel
-    hidden_size: 512
-    n_blocks: 6
+    hidden_size: 1024
+    n_blocks: 10
     embed_dim: 16
-    dropout: 0.3
-
-epochs: 100

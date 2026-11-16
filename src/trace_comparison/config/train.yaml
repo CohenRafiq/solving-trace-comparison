@@ -13,15 +13,16 @@ input: base_1000.jsonl            # file name under <data_dir>/traces_dataset/no
 solvers: null         # null = every solver in the file
 max_size: null
 puzzle_filter: all_solved
-k: 20                 # steps each trace is resampled to
-val_frac: 0.2
+k: 5                 # steps each trace is resampled to
+val_frac: 0.1
 
 # optimisation (shared by all tasks; override per task in config/task/*.yaml)
 epochs: 50
 batch_size: 128
 optimizer:
-  _target_: torch.optim.Adam
+  _target_: torch.optim.AdamW
   lr: 1.0e-3
+  weight_decay: 1e-2
 lr_scheduler:
   _target_: torch.optim.lr_scheduler.CosineAnnealingLR
   T_max: ${epochs}

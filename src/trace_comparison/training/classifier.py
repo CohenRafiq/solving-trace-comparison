@@ -37,8 +37,8 @@ class MLPClassifier(nn.Module):
         solver_id=None,          # kept for API compatibility
         return_hidden: bool = False,
     ):
-        h = self.drop(self.act(self.fc1(self.flatten(x))))
-        out = self.fc2(h)
+        h = self.act(self.fc1(self.flatten(x)))   # latent is taken before dropout
+        out = self.fc2(self.drop(h))
         return (out, [h]) if return_hidden else out
 
     @torch.no_grad()
@@ -52,9 +52,16 @@ class MLPClassifier(nn.Module):
 class ClassifierTask(Task):
     name = "classifier"
 
-    def __init__(self, model: DictConfig, name: str | None = None, channel_first: bool = False):
+    def __init__(
+        self,
+        model: DictConfig,
+        name: str | None = None,
+        channel_first: bool = False,
+        gamma: float = 0.0,
+    ):
         super().__init__(model, name)
         self.channel_first = channel_first
+        self.gamma = gamma  # focal-loss exponent; 0 = plain cross-entropy
 
     @staticmethod
     def confusion_matrix(out: PerSample, n_classes: int) -> torch.Tensor:
@@ -88,7 +95,9 @@ class ClassifierTask(Task):
     def step(self, model, batch):
         x, y = batch
         logits = model(x)
-        return F.cross_entropy(logits, y), {"pred": logits.argmax(1), "target": y}
+        ce = F.cross_entropy(logits, y, reduction="none")
+        loss = ((1 - torch.exp(-ce)) ** self.gamma * ce).mean()  # focal: down-weights easy samples
+        return loss, {"pred": logits.argmax(1), "target": y}
 
     def metrics(self, out):
         return {"acc": (out["pred"] == out["target"]).float().mean().item()}

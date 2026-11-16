@@ -402,6 +402,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/noarch/zipp-3.23.0-pyhcf101f3_1.conda
       - pypi: ./
       - pypi: https://download-r2.pytorch.org/whl/cu128/torch-2.10.0%2Bcu128-cp313-cp313-manylinux_2_28_x86_64.whl
+      - pypi: https://files.pythonhosted.org/packages/05/3f/859285794eba7e6d215e2bdf1ff81eb957b69a6c30577cf04e64782d4411/concept_erasure-0.2.4-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/05/6b/32f747947df2da6994e999492ab306a903659555dddc0fbdeb9d71f75e52/nvidia_cuda_nvrtc_cu12-12.8.93-py3-none-manylinux2010_x86_64.manylinux_2_12_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/09/fe/f61e7129e9e689d9e40bbf8a36fb90f04eceb477f4617c02c6a18463e81f/configparser-7.2.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/0d/9b/a997b638fcd068ad6e4d53b8551a7d30fe8b404d6f1804abf1df69838932/nvidia_cuda_runtime_cu12-12.8.90-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl
@@ -5908,6 +5909,7 @@ packages:
   - cka-pytorch>=1.1.3,<2
   - stable-baselines3>=2.9.0,<3
   - umap-learn>=0.5.12,<0.6
+  - concept-erasure>=0.2.4,<0.3
   requires_python: '>=3.11,<3.14'
 - pypi: https://download-r2.pytorch.org/whl/cu128/torch-2.10.0%2Bcu128-cp313-cp313-manylinux_2_28_x86_64.whl
   name: torch
@@ -5942,6 +5944,20 @@ packages:
   - optree>=0.13.0 ; extra == 'optree'
   - opt-einsum>=3.3 ; extra == 'opt-einsum'
   - pyyaml ; extra == 'pyyaml'
+  requires_python: '>=3.10'
+- pypi: https://files.pythonhosted.org/packages/05/3f/859285794eba7e6d215e2bdf1ff81eb957b69a6c30577cf04e64782d4411/concept_erasure-0.2.4-py3-none-any.whl
+  name: concept-erasure
+  version: 0.2.4
+  sha256: a7665b49d97c6aa3bfd504ca724ef460bb61237aa510ae31e9550de8619806af
+  requires_dist:
+  - torch
+  - numpy ; extra == 'dev'
+  - pre-commit ; extra == 'dev'
+  - pytest ; extra == 'dev'
+  - pyright ; extra == 'dev'
+  - scikit-learn ; extra == 'dev'
+  - datasets ; extra == 'dev'
+  - transformers>=4.0.0 ; extra == 'dev'
   requires_python: '>=3.10'
 - pypi: https://files.pythonhosted.org/packages/05/6b/32f747947df2da6994e999492ab306a903659555dddc0fbdeb9d71f75e52/nvidia_cuda_nvrtc_cu12-12.8.93-py3-none-manylinux2010_x86_64.manylinux_2_12_x86_64.whl
   name: nvidia-cuda-nvrtc-cu12
