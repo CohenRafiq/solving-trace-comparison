@@ -1,0 +1,4 @@
+blocks:
+- name: cca
+  n_components: 5
+  squared: True

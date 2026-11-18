@@ -1,6 +1,10 @@
 defaults:
-  - blocks: rmse        # default variant
-  - _self_                  # allows this file to override/extend
+  - prep: default
+  - emb: null
+  - transform: null
+  - metric: cca
+  - post: rank
+  - _self_
 
 input: base_1000.jsonl
 solvers: null

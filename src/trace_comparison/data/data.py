@@ -13,7 +13,7 @@ from dataclasses import dataclass
 import numpy as np
 import torch
 
-from trace_comparison.blocks.resample.resample import Resample
+from trace_comparison.blocks.implementations.alignment import Resample
 from trace_comparison.data.dataset import TraceDataset
 
 

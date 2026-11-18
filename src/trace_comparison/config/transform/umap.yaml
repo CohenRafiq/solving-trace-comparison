@@ -1,0 +1,9 @@
+blocks:
+  - name: pca
+    emb_dim: 50
+    whiten: True
+  - name: umap
+    emb_dim: 3
+    n_neighbors: 200
+    min_dist: 0.1
+    random_state: null

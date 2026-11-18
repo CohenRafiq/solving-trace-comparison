@@ -11,10 +11,18 @@ from .blocks import BLOCKS
 from .blocks.base import Block, DataKind
 from .data.dataset import load_trace_dataset
 
+STAGES = ["prep", "emb", "transform", "metric",  "post"]
+
 def build_blocks(cfg: DictConfig, grid_shape: tuple[int, int]) -> list[Block]:
     """Instantiate blocks from config."""
+    cfg_blocks = []
+    for stage in STAGES:
+        group = cfg.get(stage)
+        print(f"{stage}: {group}")
+        if group is not None:
+            cfg_blocks.extend(group.blocks)
     blocks = []
-    for block_cfg in cfg.blocks:
+    for block_cfg in cfg_blocks:
         block_type = block_cfg.name  # Access as attribute
         if block_type not in BLOCKS:
             raise ValueError(f"Unknown block type {block_type}")
@@ -50,11 +58,13 @@ def run_experiment(data: np.ndarray, blocks: Iterable[Block]) -> np.ndarray:
 
 @hydra.main(version_base=None, config_path="config", config_name="sim_matrix")
 def main(cfg: DictConfig) -> None:
-    """Build a solver-vs-solver similarity matrix from a traces jsonl file.
+    t0 = time.perf_counter()
+    def lap(label):
+        nonlocal t0
+        now = time.perf_counter()
+        print(f"[{label}] {now - t0:.3f}s")
+        t0 = now
 
-    Overrides are plain hydra CLI syntax, e.g.
-        python -m trace_comparison.gen_sim_matrix input=bs_test.jsonl max_size=100
-    """
     data_dir = Path(cfg.data_dir)
     dataset = load_trace_dataset(
         data_dir / "traces_dataset" / "nonograms" / cfg.input,
@@ -62,14 +72,20 @@ def main(cfg: DictConfig) -> None:
         max_size=cfg.max_size,
         puzzle_filter=cfg.puzzle_filter,
     )
+    lap("load dataset")
+
     blocks = build_blocks(cfg, dataset.grid_shape)
+    lap("build blocks")
+
     data = dataset.clues if cfg.get("clue_input", False) else dataset.traces
     matrix = run_experiment(data, blocks)
-    df = pd.DataFrame(matrix, index=dataset.solvers, columns=dataset.solvers, dtype=float)
+    lap("run_experiment")
 
+    df = pd.DataFrame(matrix, index=dataset.solvers, columns=dataset.solvers, dtype=float)
     out = data_dir / "similarity_matrix" / "nonograms" / cfg.output_file
     out.parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(out)
+    lap("save")
     print(f"Saved similarity matrix to {out} ({dataset.traces.shape[1]} puzzles)\n{df}")
 
 

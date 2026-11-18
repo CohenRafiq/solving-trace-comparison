@@ -1,0 +1,5 @@
+blocks:
+  - name: classification_latent
+    checkpoint_dir: ${oc.env:MODEL_DIR,./checkpoints}
+    device: cpu
+    model_version: null

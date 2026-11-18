@@ -20,7 +20,7 @@ class ZScoreNorm(SameShapeBlock):
     def _apply(self, x: np.ndarray) -> np.ndarray:
         x = x - x.mean(axis=-1, keepdims=True)
         std = x.std(axis=-1, keepdims=True)
-        return np.where(std > self.eps, x / np.max(std, self.eps), 0.0)
+        return x / np.maximum(std, self.eps)
 
 
 class MinmaxNorm(SameShapeBlock):
@@ -34,7 +34,7 @@ class RankNorm(SameShapeBlock):
 
 class SubtractPuzzle(SameShapeBlock):
     def _apply(self, x: np.ndarray) -> np.ndarray:
-        return x - x.mean(axis=1, keepdims=True)
+        return x - x.mean(axis=0, keepdims=True)
 
 
 class LeaceNorm(SameShapeBlock):

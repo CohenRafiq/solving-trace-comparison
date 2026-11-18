@@ -1,0 +1,4 @@
+blocks:
+  - name: pca
+    emb_dim: 25
+    whiten: True

@@ -1,0 +1,5 @@
+blocks:
+- name: resample
+  k: 5
+- name: subtract_puzzle
+- name: l2norm

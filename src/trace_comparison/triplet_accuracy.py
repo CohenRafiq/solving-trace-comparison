@@ -61,7 +61,7 @@ def main() -> None:
     parser.add_argument(
         "name",
         nargs="?",
-        default="similarity_matrix",
+        default="temp",
         help="matrix file name, with or without .csv",
     )
     sim = load_sim_matrix(parser.parse_args().name)

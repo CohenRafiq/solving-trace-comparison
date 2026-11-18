@@ -1,8 +1,0 @@
-# @package _global_
-blocks:
-  - _target_: trace_comparison.blocks.resample.Resample
-    k: 20
-  # - _target_: trace_comparison.blocks.leace.LEACENormaliser
-  - _target_: trace_comparison.blocks.normalise.Normaliser
-    mode: rank
-  - _target_: trace_comparison.blocks.cka.CKASimilarity
