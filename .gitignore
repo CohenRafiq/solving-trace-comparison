@@ -10,8 +10,7 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 
-data/
-data/*
+
 model_checkpoints/*
 models/*
 outputs/*
@@ -26,6 +25,11 @@ old/
 !archive/.gitkeep
 
 # Keep the folders (don't ignore the .gitkeep files)
+data/*
+!data/README.md
+!data/base_dataset/
+!data/similarity_matrix/
+!data/traces_dataset/
 !data/base_dataset/.gitkeep
 !data/similarity_matrix/.gitkeep
 !data/traces_dataset/.gitkeep
